@@ -7,6 +7,7 @@
   <script src="../Javascript/records.js"></script>
   <script src="../Javascript/accounts.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="../Javascript/react-loader.js"></script>
   <script src="../Javascript/script.js"></script>
   <link rel="stylesheet" href="../CSS/style.css" />
   <script src="../Javascript/form-validation.js"></script>
@@ -79,6 +80,10 @@
             <span class="text-cbsua-primary font-medium">Approved · Ready to issue</span>
             <h5 class="font-bold mt-1">REQ-2026-042 — Bond paper, letter</h5>
             <p class="text-sm text-cbsua-muted">Approved by RENJENE DS. RIVERA · 16 Oct 2026 · Requested 30 reams</p>
+          </div>
+          <div class="flex flex-wrap justify-end gap-2">
+            <button type="button" data-issue-document="gate-pass" class="px-3 py-2 border border-cbsua-border rounded-lg text-sm font-medium hover:bg-gray-50">Print Requisition Gate Pass</button>
+            <button type="button" data-issue-document="receipt" class="px-3 py-2 bg-cbsua-primary text-white rounded-lg text-sm font-medium hover:bg-green-700" disabled>Export Receipt</button>
           </div>
         </div>
       </div>

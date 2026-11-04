@@ -11,16 +11,8 @@ Open `html/index.html` in a browser, preferably through VS Code Live Server.
 
 Change your username, display name, and password from **Settings** after signing in. The admin can approve or reject requests. Approval checks current stock; approved requests can then be issued by staff, which records the issuance and deducts inventory. New requests require the requesting employee's name and employee ID. Staff can create requests, add and inspect items, receive deliveries, and maintain supplier records.
 
-This version stores accounts, records, and sessions in the current browser. It has no server-side authentication or shared database, so changes are not shared across devices and browser storage is not a secure location for real passwords or official records. Delivery attachments are not uploaded; only the selected filename is recorded. A real multi-user deployment requires a secured backend, database, and file storage.
+This version stores accounts, inventory, requests, suppliers, receipts, and issuances in the current browser's `localStorage`. Changes remain on that browser and device, but are not shared across devices. Browser storage is not a secure location for real passwords or official records. Delivery attachments are not uploaded; only the selected filename is recorded.
 
-## MongoDB connection backend
+The Stock Requests page exports its currently filtered rows as CSV. Issue Supplies can print an approved requisition gate pass and export a recorded receipt through the browser's print dialog; choose **Save as PDF** to create a PDF. Dashboard metrics show loading skeletons while browser records are read, and status messages appear as floating notifications.
 
-The Node.js backend connects to MongoDB Atlas without exposing database credentials to browser code. This connection currently provides a health check only; the login, accounts, and inventory data still use browser storage.
-
-1. Install Node.js, then run `npm install`.
-2. Copy `.env.example` to `.env`.
-3. Set `MONGODB_URI` in `.env` to the Atlas URI and replace `YOUR_URL_ENCODED_PASSWORD` with the database user's URL-encoded password. Do not commit or share `.env`.
-4. Optionally change `MONGODB_DB` or `PORT`.
-5. Run `npm start` and open `http://127.0.0.1:3000/health`. A successful connection returns `{"status":"ok","database":"cbsua_supply_office"}`.
-
-The Atlas database user's password must be supplied locally; it is not included in this repository. Ensure the machine running the backend is permitted by the cluster's Atlas network access rules.
+React and ReactDOM are included from jsDelivr and power the toast notification component. Tailwind CSS and Chart.js are also loaded from their CDNs, so use a network connection when opening the pages. Open `html/index.html` directly or use VS Code Live Server.

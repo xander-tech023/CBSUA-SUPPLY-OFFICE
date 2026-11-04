@@ -1,5 +1,5 @@
 window.IMS.pageFeatures.push(() => {
-  const { getLocalRecords, nextRecordId } = window.IMS;
+  const { getLocalRecords, nextRecordId, showToast } = window.IMS;
   const table = document.querySelector('main tbody');
   if (!table || !document.querySelector('#requestModal')) return;
 
@@ -10,6 +10,7 @@ window.IMS.pageFeatures.push(() => {
   const itemSelect = document.querySelector('#requestItem');
   const idField = document.querySelector('#requestId');
   const dateField = document.querySelector('#requestDate');
+  const exportButton = document.querySelector('[data-export-requests]');
   let statusFilter = '';
 
   function refreshRequestForm() {
@@ -60,6 +61,29 @@ window.IMS.pageFeatures.push(() => {
       row.hidden = !(statusMatch && queryMatch && officeMatch);
     });
   }
+
+  exportButton?.addEventListener('click', () => {
+    const visibleRows = [...table.rows].filter(row => !row.hidden && row.cells.length >= 5);
+    if (!visibleRows.length) return showToast('There are no requests matching the current filters.');
+    const escapeCell = value => {
+      const text = String(value).replace(/\s*\n\s*/g, ' — ');
+      const safeText = /^[\t\r ]*[=+\-@]/.test(text) ? `'${text}` : text;
+      return `"${safeText.replace(/"/g, '""')}"`;
+    };
+    const csv = [
+      ['Request / Date', 'Office / Recipient', 'Item / Quantity', 'Handler', 'Status'],
+      ...visibleRows.map(row => [...row.cells].slice(0, 5).map(cell => cell.innerText))
+    ].map(values => values.map(escapeCell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'cbsua-stock-requests.csv';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    showToast(`Exported ${visibleRows.length} filtered request${visibleRows.length === 1 ? '' : 's'}.`);
+  });
 
   tabs.forEach(button => button.addEventListener('click', () => {
     const label = button.textContent.split('·')[0].trim();

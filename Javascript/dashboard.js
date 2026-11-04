@@ -71,9 +71,16 @@ document.addEventListener('DOMContentLoaded', () => {
     stats.forEach((card, index) => {
       if (!values[index]) return;
       const content = card.querySelectorAll('p');
-      if (content[1]) content[1].textContent = String(values[index][0]);
-      if (content[2]) content[2].textContent = values[index][1];
+      if (content[1]) {
+        content[1].textContent = String(values[index][0]);
+        content[1].removeAttribute('aria-label');
+      }
+      if (content[2]) {
+        content[2].textContent = values[index][1];
+        content[2].removeAttribute('aria-label');
+      }
     });
+    document.querySelector('.dashboard-metrics')?.setAttribute('aria-busy', 'false');
 
     if (attentionList) {
       attentionList.replaceChildren();

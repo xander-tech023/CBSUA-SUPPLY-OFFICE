@@ -31,12 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     return null;
   }
+  if (currentPage === 'index.html') return;
+
   const currentUser = readCurrentUser();
   const roleHome = currentUser?.role === 'admin' ? 'dashboard.html' : 'inventory.html';
-  if (currentPage === 'index.html') {
-    if (currentUser) window.location.replace(roleHome);
-    return;
-  }
   if (!currentUser) {
     window.location.replace('index.html');
     return;
@@ -124,6 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
   const preferenceKey = 'cbsuaSupplyPreferences', preferences = readPreferences();
   let toastTimer;
+  let toastRoot;
+  let toastSequence = 0;
   function createElement(tag, className = '', text) {
     const element = document.createElement(tag);
     if (className) element.className = className;
@@ -189,9 +189,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Show notifications
   function showToast(message) {
+    if (window.React && window.ReactDOM?.createRoot) {
+      let mount = document.getElementById('ims-toast-root');
+      if (!mount) {
+        mount = createElement('div');
+        mount.id = 'ims-toast-root';
+        document.body.append(mount);
+      }
+      if (!toastRoot) toastRoot = window.ReactDOM.createRoot(mount);
+      const Toast = ({ text }) => window.React.createElement(
+        'div',
+        { className: 'ims-toast', role: 'status', 'aria-live': 'polite' },
+        text
+      );
+      toastRoot.render(window.React.createElement(Toast, { text: message, key: ++toastSequence }));
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastRoot.render(null), 3200);
+      return;
+    }
+
     let toast = document.querySelector('.ims-toast');
     if (!toast) {
-      toast = createElement('div', 'ims-toast fixed left-1/2 top-1/2 z-[120] max-w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border-t-4 border-cbsua-gold bg-cbsua-dark px-6 py-4 text-center text-sm font-medium text-white shadow-2xl');
+      toast = createElement('div', 'ims-toast');
       toast.setAttribute('role', 'status');
       toast.setAttribute('aria-live', 'polite');
       document.body.append(toast);
@@ -862,6 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         const savedIssuance = saveRecord('issuances', issuance);
         if (!savedIssuance) return;
+        window.dispatchEvent(new CustomEvent('ims:issuance-saved', { detail: savedIssuance }));
         form.reset();
         window.IMS.refreshPage?.();
         return showToast(`${issuance.id} saved successfully and stock balance updated.`);

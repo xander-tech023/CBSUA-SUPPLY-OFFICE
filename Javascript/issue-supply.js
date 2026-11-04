@@ -24,9 +24,18 @@ window.IMS.pageFeatures.push(() => {
     handler: document.getElementById('issueAuditHandler'),
     date: document.getElementById('issueAuditDate')
   };
+  const receiptButton = document.querySelector('[data-issue-document="receipt"]');
   const header = document.querySelector('main .border-2');
   let selectedItem = null;
   let selectedRequest = null;
+  let lastIssuance = [...getLocalRecords('issuances')]
+    .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))[0] || null;
+  const printDocument = document.createElement('article');
+  printDocument.id = 'imsPrintDocument';
+  printDocument.className = 'ims-print-document';
+  printDocument.hidden = true;
+  document.body.append(printDocument);
+  if (receiptButton) receiptButton.disabled = !lastIssuance;
   const today = new Date();
   today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
   form.querySelector('#issueDate').value = today.toISOString().slice(0, 10);
@@ -138,6 +147,150 @@ window.IMS.pageFeatures.push(() => {
     updatePreview(true);
   }
 
+  function makeTextElement(tag, className, text) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    element.textContent = text;
+    return element;
+  }
+
+  function printSupplyDocument(type) {
+    let request;
+    let item;
+    let issuance = null;
+    let quantity;
+    let issueDate;
+    let reference;
+    if (type === 'receipt') {
+      issuance = lastIssuance;
+      request = issuance && getLocalRecords('requests').find(entry => entry.id === issuance.requestId);
+      item = issuance && getLocalRecords('items').find(entry => entry.id === issuance.itemId);
+      if (!issuance || !request || !item) {
+        showToast('Record an issuance before exporting a receipt.');
+        return;
+      }
+      quantity = issuance.quantity;
+      issueDate = issuance.date;
+      reference = issuance.id;
+    } else {
+      request = selectedRequest;
+      item = selectedItem;
+      quantity = Number(quantityInput.value);
+      const remaining = request && getRemainingRequestQuantity(request);
+      if (!request || request.status !== 'Approved' || !item) {
+        showToast('Select an approved request before printing a gate pass.');
+        return;
+      }
+      if (!Number.isSafeInteger(quantity) || quantity <= 0 || quantity > remaining || quantity > item.quantity) {
+        showToast('Enter a valid issue quantity before printing the gate pass.');
+        return;
+      }
+      issueDate = form.querySelector('#issueDate').value;
+      reference = request.id;
+    }
+
+    const title = type === 'receipt' ? 'SUPPLY ISSUANCE RECEIPT' : 'REQUISITION GATE PASS';
+    const dateText = value => {
+      const date = new Date(`${value}T00:00:00`);
+      return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en', {
+        day: 'numeric', month: 'long', year: 'numeric'
+      }).format(date);
+    };
+    printDocument.replaceChildren();
+    const masthead = document.createElement('header');
+    masthead.className = 'ims-print-masthead';
+    const logo = document.createElement('img');
+    logo.src = '../Image/logo.png';
+    logo.alt = 'CBSUA';
+    const school = document.createElement('div');
+    school.append(
+      makeTextElement('p', 'ims-print-university', 'Central Bicol State University of Agriculture'),
+      makeTextElement('p', '', 'Sipocot Campus'),
+      makeTextElement('p', 'ims-print-office', 'SUPPLY OFFICE')
+    );
+    masthead.append(logo, school);
+    printDocument.append(masthead, makeTextElement('h1', 'ims-print-title', title));
+
+    const metadata = document.createElement('dl');
+    metadata.className = 'ims-print-metadata';
+    [
+      ['Document reference', reference],
+      ...(issuance ? [['Issuance reference', issuance.id]] : []),
+      ['Request reference', request.id],
+      ['Date', dateText(issueDate)],
+      ['Requesting office', request.office],
+      ['Recipient', request.recipient],
+      ['Employee ID', request.employeeId || issuance?.recipientEmployeeId || '—'],
+      ['Approved by', request.reviewedBy || 'Supply Office'],
+      ['Released by', issuance?.handledBy || form.querySelector('#issueHandler').value]
+    ].forEach(([label, value]) => {
+      const row = document.createElement('div');
+      row.className = 'ims-print-metadata-row';
+      row.append(makeTextElement('dt', '', label), makeTextElement('dd', '', value));
+      metadata.append(row);
+    });
+    printDocument.append(metadata);
+
+    const table = document.createElement('table');
+    table.className = 'ims-print-items';
+    const head = document.createElement('thead');
+    const headingRow = document.createElement('tr');
+    ['Item code', 'Description', 'Quantity', 'Unit'].forEach(label =>
+      headingRow.append(makeTextElement('th', '', label)));
+    head.append(headingRow);
+    const body = document.createElement('tbody');
+    const itemRow = document.createElement('tr');
+    [
+      item.id,
+      `${item.name}${item.description ? ` — ${item.description}` : ''}`,
+      String(quantity),
+      item.unit
+    ].forEach(value => itemRow.append(makeTextElement('td', '', value)));
+    body.append(itemRow);
+    table.append(head, body);
+    printDocument.append(table, makeTextElement(
+      'p',
+      'ims-print-note',
+      type === 'receipt'
+        ? 'This document confirms the supply issuance recorded by the CBSUA Supply Office.'
+        : 'Supplies listed above are authorized for release against the approved requisition.'
+    ));
+
+    const signatures = document.createElement('section');
+    signatures.className = 'ims-print-signatures';
+    [
+      ['Received by', request.recipient, 'Signature / Date'],
+      ['Released by', issuance?.handledBy || form.querySelector('#issueHandler').value, 'Signature / Date'],
+      ['Approved by', request.reviewedBy || 'Supply Office', 'Signature / Date']
+    ].forEach(([label, name, caption]) => {
+      const block = document.createElement('div');
+      block.className = 'ims-print-signature';
+      block.append(
+        makeTextElement('p', 'ims-print-signature-label', label),
+        makeTextElement('p', 'ims-print-signature-name', name),
+        makeTextElement('p', 'ims-print-signature-caption', caption)
+      );
+      signatures.append(block);
+    });
+    printDocument.append(signatures);
+
+    const originalTitle = document.title;
+    document.title = `CBSUA-${type === 'receipt' ? 'Receipt' : 'Gate-Pass'}-${reference}`;
+    printDocument.hidden = false;
+    window.addEventListener('afterprint', () => {
+      printDocument.hidden = true;
+      document.title = originalTitle;
+    }, { once: true });
+    window.print();
+  }
+
+  document.querySelectorAll('[data-issue-document]').forEach(button => {
+    button.addEventListener('click', () => printSupplyDocument(button.dataset.issueDocument));
+  });
+  window.addEventListener('ims:issuance-saved', event => {
+    lastIssuance = event.detail;
+    if (receiptButton) receiptButton.disabled = !lastIssuance;
+  });
   requestSelect.addEventListener('change', () => updatePreview(true));
   quantityInput.addEventListener('input', () => updatePreview());
   window.addEventListener('ims:records-updated', refreshRequests);

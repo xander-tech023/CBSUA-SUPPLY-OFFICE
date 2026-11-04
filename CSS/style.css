@@ -45,17 +45,194 @@ body {
 }
 
 .ims-toast {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 120;
+  max-width: min(28rem, calc(100vw - 2rem));
+  pointer-events: none;
+  padding: 0.875rem 1.25rem;
+  border-top: 4px solid var(--cbsua-gold);
+  border-radius: 0.75rem;
+  background: var(--cbsua-dark);
+  color: #fff;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+  font-size: 0.875rem;
+  font-weight: 500;
   animation: ims-toast-in 180ms ease-out;
+}
+
+.dashboard-skeleton {
+  display: inline-block;
+  border-radius: 0.25rem;
+  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+  background-size: 200% 100%;
+  animation: dashboard-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.dashboard-skeleton-value {
+  width: 3.25rem;
+  height: 2rem;
+}
+
+.dashboard-skeleton-detail {
+  width: min(12rem, 90%);
+  height: 0.75rem;
+}
+
+.ims-print-document {
+  display: none;
+}
+
+@keyframes dashboard-skeleton-shimmer {
+  to {
+    background-position: -200% 0;
+  }
 }
 
 @keyframes ims-toast-in {
   from {
     opacity: 0;
-    transform: translate(-50%, calc(-50% + 0.75rem));
+    transform: translateY(-0.5rem);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, -50%);
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ims-toast,
+  .dashboard-skeleton {
+    animation: none;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 18mm;
+  }
+
+  html,
+  body {
+    min-height: 0 !important;
+    background: #fff !important;
+    color: #111827 !important;
+  }
+
+  body > :not(.ims-print-document) {
+    display: none !important;
+  }
+
+  .ims-print-document,
+  .ims-print-document[hidden] {
+    display: block !important;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    padding: 0;
+    background: #fff !important;
+    color: #111827 !important;
+    font: 10pt/1.45 Arial, sans-serif;
+  }
+
+  .ims-print-masthead {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 2px solid #166534;
+    text-align: center;
+  }
+
+  .ims-print-masthead img {
+    width: 3.5rem;
+    height: 3.5rem;
+    object-fit: contain;
+  }
+
+  .ims-print-masthead p {
+    margin: 0.1rem 0;
+  }
+
+  .ims-print-university {
+    font-size: 12pt;
+    font-weight: 700;
+  }
+
+  .ims-print-office {
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .ims-print-title {
+    margin: 1.5rem 0;
+    text-align: center;
+    font-size: 15pt;
+    font-weight: 700;
+  }
+
+  .ims-print-metadata {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem 1.5rem;
+  }
+
+  .ims-print-metadata-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .ims-print-metadata-row dt {
+    font-weight: 700;
+  }
+
+  .ims-print-metadata-row dd {
+    margin: 0;
+  }
+
+  .ims-print-items {
+    width: 100%;
+    margin-top: 1.5rem;
+    border-collapse: collapse;
+  }
+
+  .ims-print-items th,
+  .ims-print-items td {
+    padding: 0.6rem;
+    border: 1px solid #9ca3af;
+    text-align: left;
+  }
+
+  .ims-print-items th {
+    background: #f3f4f6 !important;
+  }
+
+  .ims-print-note {
+    margin-top: 1.5rem;
+  }
+
+  .ims-print-signatures {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-top: 4rem;
+    text-align: center;
+  }
+
+  .ims-print-signature-name {
+    margin-top: 3rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid #111827;
+    font-weight: 700;
+  }
+
+  .ims-print-signature-label,
+  .ims-print-signature-caption {
+    margin: 0;
+    font-size: 9pt;
   }
 }
 
