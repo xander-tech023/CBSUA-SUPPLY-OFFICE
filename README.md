@@ -15,4 +15,7 @@ This version stores accounts, inventory, requests, suppliers, receipts, and issu
 
 The Stock Requests page exports its currently filtered rows as CSV. Issue Supplies can print an approved requisition gate pass and export a recorded receipt through the browser's print dialog; choose **Save as PDF** to create a PDF. Dashboard metrics show loading skeletons while browser records are read, and status messages appear as floating notifications.
 
-React and ReactDOM are included from jsDelivr and power the toast notification component. Tailwind CSS and Chart.js are also loaded from their CDNs, so use a network connection when opening the pages. Open `html/index.html` directly or use VS Code Live Server.
+React and ReactDOM are included from jsDelivr and power the toast notification component. Tailwind CSS and Chart.js are also loaded from their CDNs, so use a network connection when opening the pages. Open `html/index.html` directly or use VS Code Live Server. 
+
+
+hahaha
