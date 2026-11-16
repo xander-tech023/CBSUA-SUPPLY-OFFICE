@@ -1,27 +1,52 @@
 window.IMS = window.IMS || {};
 
 (() => {
-  const accountsKey = 'cbsuaSupplyAccounts';
-  const defaults = {
-    admin: { username: 'admin', password: 'admin123', name: 'Renjene D.S. Rivera', title: 'Head, Supply Office' },
-    staff: { username: 'staff', password: 'staff123', name: 'Maria Santos', title: 'Supply Staff Officer' }
-  };
+  const backendHint = 'Database login requires XAMPP. Start Apache and MySQL, then open http://localhost/CBSUA-SUPPLY-OFFICE/html/index.html instead of Live Server.';
 
-  function getAccounts() {
-    const saved = localStorage.getItem(accountsKey);
-    if (!saved) return JSON.parse(JSON.stringify(defaults));
-    const accounts = JSON.parse(saved);
-    if (!accounts || !accounts.admin || !accounts.staff
-      || !['admin', 'staff'].every(role => ['username', 'password', 'name', 'title']
-        .every(field => typeof accounts[role][field] === 'string' && accounts[role][field]))) {
-      throw new Error('Saved account information is incomplete.');
+  async function readResponse(response) {
+    if (!response.headers.get('content-type')?.toLowerCase().includes('application/json')) {
+      throw new Error(backendHint);
     }
-    return accounts;
+    try {
+      return await response.json();
+    } catch {
+      throw new Error(`The XAMPP login API returned an invalid response. ${backendHint}`);
+    }
   }
 
-  function saveAccounts(accounts) {
-    localStorage.setItem(accountsKey, JSON.stringify(accounts));
+  async function request(action, payload = {}) {
+    let response;
+    try {
+      response = await fetch('../api.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...payload })
+      });
+    } catch {
+      throw new Error(backendHint);
+    }
+    const result = await readResponse(response);
+    if (!response.ok || !result.ok) {
+      throw new Error(result.error || 'The server could not complete the request.');
+    }
+    return result;
   }
 
-  window.IMS.accounts = { getAccounts, saveAccounts };
+  window.IMS.accounts = {
+    login: (role, username, password, remember) => request('login', { role, username, password, remember }),
+    async getSession() {
+      let response;
+      try {
+        response = await fetch('../api.php?action=session', { credentials: 'same-origin' });
+      } catch {
+        throw new Error(backendHint);
+      }
+      const result = await readResponse(response);
+      if (response.status === 401) return null;
+      if (!response.ok || !result.ok) throw new Error(result.error || 'The session could not be checked.');
+      return result.user;
+    },
+    logout: () => request('logout')
+  };
 })();

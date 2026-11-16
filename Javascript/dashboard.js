@@ -189,8 +189,5 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   window.addEventListener('ims:records-updated', update);
-  window.addEventListener('storage', event => {
-    if (!event.key || event.key === 'cbsuaSupplyRecords') update();
-  });
   update();
 });

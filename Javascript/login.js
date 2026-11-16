@@ -15,34 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const username = document.getElementById('username').value.trim().toLowerCase();
     const password = passInput.value;
     const role = loginForm.querySelector('input[name="role"]:checked')?.value;
-    let account;
-    try {
-      account = window.IMS.accounts.getAccounts()[role];
-    } catch (error) {
-      console.error('Saved account information could not be read.', error);
-      errorMessage.textContent = 'Account information could not be read. Contact the Supply Office administrator.';
-      errorMessage.classList.remove('hidden');
-      return;
-    }
-
-    if (!account || username !== account.username.toLowerCase() || password !== account.password) {
-      errorMessage.textContent = 'Username or password is incorrect for the selected workspace.';
-      errorMessage.classList.remove('hidden');
-      return;
-    }
-
-    const currentUser = { username: account.username, name: account.name, title: account.title, role };
-    try {
-      localStorage.removeItem('cbsuaSupplyUser');
-      sessionStorage.removeItem('cbsuaSupplyUser');
-      const storage = document.getElementById('rememberMe').checked ? localStorage : sessionStorage;
-      storage.setItem('cbsuaSupplyUser', JSON.stringify(currentUser));
-    } catch (error) {
-      console.error('The workspace session could not be saved.', error);
-      errorMessage.textContent = 'This browser could not save your workspace session. Enable browser storage and try again.';
-      errorMessage.classList.remove('hidden');
-      return;
-    }
-    window.location.href = role === 'admin' ? 'dashboard.html' : 'inventory.html';
+    errorMessage.classList.add('hidden');
+    window.IMS.accounts.login(role, username, password, document.getElementById('rememberMe').checked)
+      .then(() => { window.location.href = role === 'admin' ? 'dashboard.html' : 'inventory.html'; })
+      .catch(error => {
+        console.error('Login request failed.', error);
+        errorMessage.textContent = error.message || 'Username or password is incorrect for the selected workspace.';
+        errorMessage.classList.remove('hidden');
+      });
   });
 });

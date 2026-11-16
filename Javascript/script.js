@@ -19,26 +19,27 @@ window.tailwind.config = {
     fontFamily: { sans: ['system-ui', 'sans-serif'] }
   } }
 };
-document.addEventListener('DOMContentLoaded', () => {
-  function readCurrentUser() {
-    for (const storage of [localStorage, sessionStorage]) {
-      try {
-        const user = JSON.parse(storage.getItem('cbsuaSupplyUser') || 'null');
-        if (user && ['admin', 'staff'].includes(user.role)) return user;
-      } catch (error) {
-        console.error('The saved workspace session could not be read.', error);
-      }
-    }
-    return null;
-  }
+document.addEventListener('DOMContentLoaded', async () => {
   if (currentPage === 'index.html') return;
 
-  const currentUser = readCurrentUser();
-  const roleHome = currentUser?.role === 'admin' ? 'dashboard.html' : 'inventory.html';
-  if (!currentUser) {
-    window.location.replace('index.html');
+  let currentUser;
+  try {
+    currentUser = await window.IMS.accounts.getSession();
+    if (!currentUser) {
+      window.location.replace('index.html');
+      return;
+    }
+    await window.IMS.initializeRecords();
+    window.dispatchEvent(new CustomEvent('ims:records-updated'));
+  } catch (error) {
+    console.error('The XAMPP workspace could not be initialized.', error);
+    const message = document.createElement('p');
+    message.className = 'mx-auto mt-12 max-w-xl rounded-lg bg-red-50 p-5 text-red-800';
+    message.textContent = 'Could not connect to the XAMPP database. Start Apache and MySQL in XAMPP, finish setup, and reload this page.';
+    document.body.replaceChildren(message);
     return;
   }
+  const roleHome = currentUser?.role === 'admin' ? 'dashboard.html' : 'inventory.html';
   if (currentPage === 'dashboard.html' && currentUser.role !== 'admin') {
     window.location.replace(roleHome);
     return;
@@ -378,37 +379,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function openSettings() {
     dialogTitle.textContent = 'Settings';
-    dialogDescription.textContent = 'Update your account information and workspace preferences.';
+    dialogDescription.textContent = 'View your account and manage workspace preferences.';
     dialogContent.replaceChildren();
     const accountHeading = createElement('h3', 'text-base font-semibold text-gray-900 dark:text-gray-100', 'Account information');
-    const accountNote = createElement('p', 'text-xs text-gray-500 dark:text-gray-300', 'Changes apply to this workspace account.');
-    const accountForm = createElement('form', 'space-y-3');
-    accountForm.id = 'accountForm';
-    const addAccountField = (labelText, id, type, value, autocomplete) => {
-      const wrapper = createElement('div');
-      const label = createElement('label', 'mb-1 block font-medium text-gray-800 dark:text-gray-100', labelText);
-      label.htmlFor = id;
-      const input = createElement('input', 'w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100');
-      input.id = id;
-      input.name = id;
-      input.type = type;
-      input.value = value || '';
-      input.autocomplete = autocomplete;
-      input.required = id !== 'accountNewPassword' && id !== 'accountConfirmPassword';
-      if (id === 'accountUsername') input.minLength = 3;
-      if (id === 'accountNewPassword') input.minLength = 8;
-      wrapper.append(label, input);
-      accountForm.append(wrapper);
-    };
-    addAccountField('Username', 'accountUsername', 'text', currentUser.username, 'username');
-    addAccountField('Display name', 'accountName', 'text', currentUser.name, 'name');
-    addAccountField('Current password', 'accountCurrentPassword', 'password', '', 'current-password');
-    addAccountField('New password (optional)', 'accountNewPassword', 'password', '', 'new-password');
-    addAccountField('Confirm new password', 'accountConfirmPassword', 'password', '', 'new-password');
-    const saveAccount = createElement('button', 'rounded-lg bg-cbsua-primary px-4 py-2 font-medium text-white hover:bg-green-700', 'Save account');
-    saveAccount.type = 'submit';
-    accountForm.append(saveAccount);
-    dialogContent.append(accountHeading, accountNote, accountForm);
+    const accountInfo = createElement('div', 'rounded-lg border border-gray-200 p-3 dark:border-gray-700');
+    accountInfo.append(
+      createElement('p', 'font-medium text-gray-900 dark:text-gray-100', `${currentUser.name} · ${currentUser.role}`),
+      createElement('p', 'mt-1 text-xs text-gray-500 dark:text-gray-300', `Username: ${currentUser.username}`),
+      createElement('p', 'mt-2 text-xs text-gray-500 dark:text-gray-300', 'Admin and staff login credentials are fixed and cannot be changed here.')
+    );
+    dialogContent.append(accountHeading, accountInfo);
     const appearanceHeading = createElement('h3', 'border-t border-gray-200 pt-4 text-base font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100', 'Appearance');
     dialogContent.append(appearanceHeading);
     const addSetting = (labelText, id, options) => {
@@ -445,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
     dialogDescription.textContent = 'CBSUA Supply Office Inventory Management System';
     dialogContent.replaceChildren();
     [
-      'Use the workspace menu to move between the Dashboard, Inventory, Stock Requests, Issue Supplies, Receive Stock, and Suppliers. Inventory items, requests, suppliers, and stock movements are saved in this browser on this device.',
+      'Use the workspace menu to move between the Dashboard, Inventory, Stock Requests, Issue Supplies, Receive Stock, and Suppliers. Inventory items, requests, suppliers, and stock movements are saved in the XAMPP database.',
       'For account access, password resets, or operational support, contact the Supply Office in person.'
     ].forEach(text => dialogContent.append(createElement('p', '', text)));
     dialogActions.replaceChildren();
@@ -469,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Click actions
   function setupActions() {
-    document.addEventListener('click', event => {
+    document.addEventListener('click', async event => {
       const target = event.target.closest('button, a');
       if (!target) return;
       if (target.matches('[data-open-settings]')) {
@@ -503,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (target.matches('[data-confirm-dialog]')) {
         const action = confirmationAction;
         closeDialog();
-        action?.();
+        await action?.();
         return;
       }
       if (target.matches('.ims-menu-toggle')) return setMenuOpen(document.getElementById('sidebar')?.classList.contains('-translate-x-full'));
@@ -517,9 +497,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const label = target.textContent.trim();
       if (target.matches('[data-sign-out]')) {
         event.preventDefault();
-        localStorage.removeItem('cbsuaSupplyUser');
-        sessionStorage.removeItem('cbsuaSupplyUser');
-        window.location.href = 'index.html';
+        try {
+          await window.IMS.accounts.logout();
+          window.location.href = 'index.html';
+        } catch (error) {
+          console.error('Sign out failed.', error);
+          showToast('Could not sign out. Please try again.');
+        }
         return;
       }
       if (target.matches('[data-request-action]')) {
@@ -532,8 +516,8 @@ document.addEventListener('DOMContentLoaded', () => {
           `${status} stock request`,
           `Are you sure you want to ${status.toLowerCase()} ${requestId}?`,
           status,
-          () => {
-            if (!updateRequestStatus(requestId, status)) return;
+          async () => {
+            if (!await updateRequestStatus(requestId, status)) return;
             window.IMS.refreshPage();
             const pendingCount = getLocalRecords('requests').filter(requestEntry => requestEntry.status === 'Pending').length;
             const countBadge = document.querySelector('#sidebar nav a[href="stock_request.html"] span');
@@ -634,8 +618,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'Approve stock request',
             `Are you sure you want to approve ${requestId}?`,
             'Approve',
-            () => {
-              if (!updateRequestStatus(requestId, 'Approved')) return;
+            async () => {
+              if (!await updateRequestStatus(requestId, 'Approved')) return;
               const request = getLocalRecords('requests').find(entry => entry.id === requestId);
               if (request) addRequestRow(request);
               showToast(`${requestId} approved.`);
@@ -684,53 +668,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   // Form handlers
   function setupForms() {
-    document.addEventListener('submit', event => {
+    document.addEventListener('submit', async event => {
       const form = event.target;
       if (form.id === 'loginForm') return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (form.id === 'accountForm') {
-        const username = form.querySelector('#accountUsername').value.trim();
-        const name = form.querySelector('#accountName').value.trim();
-        const currentPassword = form.querySelector('#accountCurrentPassword').value;
-        const newPassword = form.querySelector('#accountNewPassword').value;
-        const confirmPassword = form.querySelector('#accountConfirmPassword').value;
-        let accounts;
-        try {
-          accounts = window.IMS.accounts.getAccounts();
-        } catch (error) {
-          console.error('Account information could not be read.', error);
-          return showToast('Account information could not be read. Contact the administrator.');
-        }
-        const account = accounts[currentUser.role];
-        if (account.password !== currentPassword) return showToast('The current password is incorrect.');
-        if (accounts[currentUser.role === 'admin' ? 'staff' : 'admin'].username.toLowerCase() === username.toLowerCase()) {
-          return showToast('That username is already assigned to the other workspace.');
-        }
-        if (newPassword && newPassword !== confirmPassword) {
-          return showToast('The new password and confirmation do not match.');
-        }
-        if (!newPassword && confirmPassword) return showToast('Enter a new password before confirming it.');
-        Object.assign(account, { username, name });
-        if (newPassword) account.password = newPassword;
-        try {
-          window.IMS.accounts.saveAccounts(accounts);
-          Object.assign(currentUser, { username, name });
-          const sessionStorageTarget = localStorage.getItem('cbsuaSupplyUser') ? localStorage : sessionStorage;
-          sessionStorageTarget.setItem('cbsuaSupplyUser', JSON.stringify(currentUser));
-        } catch (error) {
-          console.error('Account changes could not be saved.', error);
-          return showToast('Account changes could not be saved in this browser.');
-        }
-        const profile = document.querySelector('main > .mb-8 [class*="sm:block"]');
-        if (profile) {
-          profile.querySelector('p').textContent = currentUser.name;
-          const avatar = profile.previousElementSibling;
-          if (avatar) avatar.textContent = currentUser.name.split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
-        }
-        closeDialog();
-        return showToast('Account information updated.');
-      }
       if (form.id === 'addItemForm') {
         const fields = [...form.querySelectorAll('input, select, textarea')];
         const minimum = Number(fields[6].value);
@@ -749,8 +691,8 @@ document.addEventListener('DOMContentLoaded', () => {
           return showToast(`${item.id} already exists in this inventory.`);
         }
         const savedItem = itemIdBeingEdited
-          ? updateInventoryItem(itemIdBeingEdited, item)
-          : saveRecord('items', item);
+          ? await updateInventoryItem(itemIdBeingEdited, item)
+          : await saveRecord('items', item);
         if (!savedItem) return;
         addInventoryRow(savedItem);
         document.querySelector('#searchInput')?.dispatchEvent(new Event('input', { bubbles: true }));
@@ -789,7 +731,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (getLocalRecords('requests').some(savedRequest => savedRequest.id === request.id)) {
           return showToast(`${request.id} already exists.`);
         }
-        const savedRequest = saveRecord('requests', request);
+        const savedRequest = await saveRecord('requests', request);
         if (!savedRequest) return;
         form.reset();
         form.closest('.fixed')?.classList.add('hidden');
@@ -809,8 +751,8 @@ document.addEventListener('DOMContentLoaded', () => {
           return showToast('A supplier with this ID or name already exists.');
         }
         const savedSupplier = supplierBeingEdited
-          ? updateSupplier(supplierBeingEdited, supplier)
-          : saveRecord('suppliers', supplier);
+          ? await updateSupplier(supplierBeingEdited, supplier)
+          : await saveRecord('suppliers', supplier);
         if (!savedSupplier) return;
         if (supplierBeingEdited) window.IMS.refreshPage();
         else {
@@ -848,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
           remarks: form.querySelector('textarea')?.value.trim() || '',
           attachmentName: form.dataset.attachmentName || form.querySelector('#receiptUpload')?.files[0]?.name || ''
         };
-        const savedReceipt = saveRecord('receipts', receipt);
+        const savedReceipt = await saveRecord('receipts', receipt);
         if (!savedReceipt) return;
         form.reset();
         delete form.dataset.attachmentName;
@@ -879,7 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
           date: form.querySelector('#issueDate').value, handledBy: `${currentUser.name} — ${currentUser.title}`,
           remarks: form.querySelector('textarea')?.value.trim() || ''
         };
-        const savedIssuance = saveRecord('issuances', issuance);
+        const savedIssuance = await saveRecord('issuances', issuance);
         if (!savedIssuance) return;
         window.dispatchEvent(new CustomEvent('ims:issuance-saved', { detail: savedIssuance }));
         form.reset();
