@@ -333,7 +333,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const dialogActions = dialog.querySelector('.ims-settings-actions');
   let dialogOpener = null;
   let confirmationAction = null;
+  let previousDocumentOverflow = null;
   function closeDialog() {
+    if (!dialog.hidden) {
+      document.documentElement.style.overflow = previousDocumentOverflow || '';
+      previousDocumentOverflow = null;
+    }
     dialog.hidden = true;
     dialog.classList.add('hidden');
     dialog.classList.remove('grid');
@@ -342,6 +347,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     dialogOpener = null;
   }
   function showDialog() {
+    if (dialog.hidden) previousDocumentOverflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
     dialog.hidden = false;
     dialog.classList.remove('hidden');
     dialog.classList.add('grid');
