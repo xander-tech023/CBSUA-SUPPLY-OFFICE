@@ -110,7 +110,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const transactions = [
         ...getLocalRecords('receipts').map(record => ({ ...record, movement: 'Received' })),
         ...getLocalRecords('issuances').map(record => ({ ...record, movement: 'Issued' }))
-      ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        || String(b.id).localeCompare(String(a.id)));
       transactionBody.replaceChildren();
       transactions.slice(0, 8).forEach(record => {
         const row = document.createElement('tr');

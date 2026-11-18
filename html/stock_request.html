@@ -197,25 +197,13 @@
         <button type="button" data-close-modal class="text-cbsua-muted hover:text-black" aria-label="Close dialog">✕</button>
       </div>
       <form id="requestForm" class="space-y-5">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block font-medium mb-2">Request ID</label>
-            <input id="requestId" type="text" class="w-full px-4 py-2.5 border border-cbsua-border rounded-lg" value="REQ-2026-045" readonly />
-          </div>
-          <div>
-            <label class="block font-medium mb-2">Request date *</label>
-            <input id="requestDate" type="date" class="w-full px-4 py-2.5 border border-cbsua-border rounded-lg" value="2026-10-16" required />
-          </div>
+        <div>
+          <label class="block font-medium mb-2">Request date *</label>
+          <input id="requestDate" type="date" class="w-full px-4 py-2.5 border border-cbsua-border rounded-lg" value="2026-10-16" required />
         </div>
         <div>
           <label class="block font-medium mb-2">Requesting office *</label>
-          <select id="requestOffice" class="w-full px-4 py-2.5 border border-cbsua-border rounded-lg" required>
-            <option>Registrar's Office</option>
-            <option>Accounting Office</option>
-            <option>Procurement Office</option>
-            <option>Clinic</option>
-            <option>ICT Office</option>
-          </select>
+          <input id="requestOffice" type="text" maxlength="150" class="w-full px-4 py-2.5 border border-cbsua-border rounded-lg" placeholder="Enter the requesting office" required />
         </div>
         <div>
           <label class="block font-medium mb-2" for="requestRecipient">Requesting employee *</label>

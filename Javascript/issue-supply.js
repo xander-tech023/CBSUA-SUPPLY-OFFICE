@@ -77,7 +77,7 @@ window.IMS.pageFeatures.push(() => {
     officeInput.value = selectedRequest.office;
     recipientInput.value = selectedRequest.recipient;
     recipientIdInput.value = selectedRequest.employeeId || 'Not recorded for this request';
-    if (audit.reference) audit.reference.textContent = window.IMS.nextRecordId('issuances', 'ISS-2026-', 20);
+    if (audit.reference) audit.reference.textContent = 'Assigned on save';
     if (audit.request) audit.request.textContent = selectedRequest.id;
     if (audit.recipient) audit.recipient.textContent = selectedRequest.employeeId
       ? `${selectedRequest.recipient} · ${selectedRequest.employeeId}`
@@ -161,6 +161,7 @@ window.IMS.pageFeatures.push(() => {
     let quantity;
     let issueDate;
     let reference;
+    let office;
     if (type === 'receipt') {
       issuance = lastIssuance;
       request = issuance && getLocalRecords('requests').find(entry => entry.id === issuance.requestId);
@@ -172,6 +173,7 @@ window.IMS.pageFeatures.push(() => {
       quantity = issuance.quantity;
       issueDate = issuance.date;
       reference = issuance.id;
+      office = issuance.office;
     } else {
       request = selectedRequest;
       item = selectedItem;
@@ -187,6 +189,7 @@ window.IMS.pageFeatures.push(() => {
       }
       issueDate = form.querySelector('#issueDate').value;
       reference = request.id;
+      office = officeInput.value.trim();
     }
 
     const title = type === 'receipt' ? 'SUPPLY ISSUANCE RECEIPT' : 'REQUISITION GATE PASS';
@@ -218,7 +221,7 @@ window.IMS.pageFeatures.push(() => {
       ...(issuance ? [['Issuance reference', issuance.id]] : []),
       ['Request reference', request.id],
       ['Date', dateText(issueDate)],
-      ['Requesting office', request.office],
+      ['Requesting office', office],
       ['Recipient', request.recipient],
       ['Employee ID', request.employeeId || issuance?.recipientEmployeeId || '—'],
       ['Approved by', request.reviewedBy || 'Supply Office'],
@@ -290,9 +293,13 @@ window.IMS.pageFeatures.push(() => {
   window.addEventListener('ims:issuance-saved', event => {
     lastIssuance = event.detail;
     if (receiptButton) receiptButton.disabled = !lastIssuance;
+    if (audit.reference) audit.reference.textContent = lastIssuance.id;
   });
   requestSelect.addEventListener('change', () => updatePreview(true));
   quantityInput.addEventListener('input', () => updatePreview());
+  officeInput.addEventListener('input', () => {
+    if (audit.office) audit.office.textContent = officeInput.value || '—';
+  });
   window.addEventListener('ims:records-updated', refreshRequests);
   refreshRequests();
 });

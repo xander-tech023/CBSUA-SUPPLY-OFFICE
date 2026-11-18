@@ -29,6 +29,18 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     return Math.max(0, requested - issued);
   }
 
+  function compareRecordIdsDescending(left, right) {
+    const leftNumber = Number(String(left).match(/(\d+)$/)?.[1]) || 0;
+    const rightNumber = Number(String(right).match(/(\d+)$/)?.[1]) || 0;
+    return rightNumber - leftNumber || String(right).localeCompare(String(left));
+  }
+
+  function sortElementsById(container, dataKey) {
+    [...container.children]
+      .sort((left, right) => compareRecordIdsDescending(left.dataset[dataKey], right.dataset[dataKey]))
+      .forEach(element => container.append(element));
+  }
+
   function updateInventoryStatus(item) {
     const expiry = item.expiry && new Date(`${item.expiry}T00:00:00`);
     const daysUntilExpiry = expiry ? Math.ceil((expiry - new Date()) / 86400000) : Infinity;
@@ -111,6 +123,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
         .forEach((value, index) => { existingRow.cells[index + 1].textContent = value; });
       const badge = existingRow.cells[5].querySelector('span');
       if (badge) Object.assign(badge, { className: statusClass, textContent: status });
+      sortElementsById(table, 'itemId');
       return;
     }
     const row = createElement('tr', 'border-b border-cbsua-border/50 hover:bg-gray-50 dark:hover:bg-gray-700');
@@ -131,6 +144,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     actionCell.append(editButton);
     row.append(actionCell);
     table.append(row);
+    sortElementsById(table, 'itemId');
   }
 
   function addRequestRow(request) {
@@ -224,7 +238,8 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
         actionCell.textContent = status;
       }
     }
-    table.prepend(row);
+    table.append(row);
+    sortElementsById(table, 'requestId');
   }
 
   function addSupplierCard(supplier) {
@@ -262,13 +277,15 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     edit.dataset.supplierId = supplier.id;
     footer.append(usage, edit);
     card.append(footer);
-    list.prepend(card);
+    list.append(card);
+    sortElementsById(list, 'supplierId');
   }
 
   function addTransactionRow(record, movementType) {
     const table = document.querySelector('main tbody');
     if (!table || [...table.rows].some(row => row.innerText.includes(record.id))) return;
     const row = createElement('tr', 'border-b border-cbsua-border/50');
+    row.dataset.transactionId = record.id;
     const dateCell = createElement('td', 'py-3');
     dateCell.append(
       createElement('p', 'font-medium', record.id),
@@ -283,7 +300,8 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     row.append(movementCell,
       createElement('td', 'py-3', movementType === 'Received' ? record.supplier : record.office),
       createElement('td', 'py-3', movementType === 'Received' ? `Received by ${record.receivedBy}` : `${record.recipient} / ${record.handledBy}`));
-    table.prepend(row);
+    table.append(row);
+    sortElementsById(table, 'transactionId');
   }
 
   function restoreLocalRecords() {
@@ -291,7 +309,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     if (currentPage === 'dashboard.html') {
       [['receipts', 'Received'], ['issuances', 'Issued']]
         .flatMap(([resource, type]) => getLocalRecords(resource).map(record => [record, type]))
-        .sort((left, right) => new Date(right[0].createdAt) - new Date(left[0].createdAt))
+        .sort((left, right) => compareRecordIdsDescending(left[0].id, right[0].id))
         .forEach(([record, type]) => addTransactionRow(record, type));
       return;
     }
@@ -307,28 +325,12 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     if (table) table.replaceChildren();
     const supplierList = currentPage === 'suppliers.html' ? document.querySelector('main .space-y-4') : null;
     supplierList?.replaceChildren();
-    const records = getLocalRecords(resource[0]);
-    (currentPage === 'stock_request.html' || currentPage === 'suppliers.html' ? [...records].reverse() : records)
+    [...getLocalRecords(resource[0])]
+      .sort((left, right) => compareRecordIdsDescending(left.id, right.id))
       .forEach(resource[1]);
     const filter = currentPage === 'inventory.html' ? document.querySelector('#searchInput')
       : currentPage === 'stock_request.html' ? document.querySelector('main input[type="text"]') : null;
     filter?.dispatchEvent(new Event('input', { bubbles: true }));
-    const idConfig = {
-      'stock_request.html': ['#requestForm input[readonly]', 'requests', 'REQ-2026-', 44],
-      'suppliers.html': ['#supplierForm input[readonly]', 'suppliers', 'SUP-', 3]
-    }[currentPage];
-    if (idConfig) {
-      const idField = document.querySelector(idConfig[0]);
-      if (idField) idField.value = nextRecordId(...idConfig.slice(1));
-    }
-  }
-
-  function nextRecordId(resource, prefix, initialValue) {
-    const nextNumber = getLocalRecords(resource).reduce((maximum, record) => {
-      const number = Number(record.id.match(/(\d+)$/)?.[1]) || initialValue;
-      return Math.max(maximum, number);
-    }, initialValue) + 1;
-    return `${prefix}${String(nextNumber).padStart(3, '0')}`;
   }
 
   Object.assign(window.IMS, {
@@ -343,7 +345,6 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     addRequestRow,
     addSupplierCard,
     restoreLocalRecords,
-    nextRecordId,
     refreshPage() {
       restoreLocalRecords();
       window.dispatchEvent(new CustomEvent('ims:records-updated'));

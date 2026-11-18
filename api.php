@@ -144,7 +144,8 @@ function readRecords(mysqli $db): array
     $records = ['items' => [], 'requests' => [], 'suppliers' => [], 'receipts' => [], 'issuances' => []];
     $result = $db->query(
         'SELECT i.*, i.expiry_date AS expiry, s.name AS supplier_name FROM inventory_items i
-         LEFT JOIN suppliers s ON s.id = i.supplier_id ORDER BY i.id'
+         LEFT JOIN suppliers s ON s.id = i.supplier_id
+         ORDER BY CAST(SUBSTRING_INDEX(i.id, "-", -1) AS UNSIGNED) DESC, i.id DESC'
     );
     while ($row = $result->fetch_assoc()) {
         $records['items'][] = [
@@ -158,7 +159,8 @@ function readRecords(mysqli $db): array
     $result = $db->query(
         'SELECT r.*, i.name AS item_name, i.unit AS item_unit, u.full_name AS reviewer_name
          FROM stock_requests r JOIN inventory_items i ON i.id = r.item_id
-         LEFT JOIN users u ON u.id = r.reviewed_by ORDER BY r.created_at, r.id'
+         LEFT JOIN users u ON u.id = r.reviewed_by
+         ORDER BY CAST(SUBSTRING_INDEX(r.id, "-", -1) AS UNSIGNED) DESC, r.id DESC'
     );
     while ($row = $result->fetch_assoc()) {
         $records['requests'][] = [
@@ -174,7 +176,8 @@ function readRecords(mysqli $db): array
         'SELECT s.*,
           (SELECT COUNT(*) FROM inventory_items i WHERE i.supplier_id = s.id) AS item_count,
           (SELECT COUNT(*) FROM stock_receipts r WHERE r.supplier_id = s.id) AS delivery_count
-         FROM suppliers s ORDER BY s.id'
+         FROM suppliers s
+         ORDER BY CAST(SUBSTRING_INDEX(s.id, "-", -1) AS UNSIGNED) DESC, s.id DESC'
     );
     while ($row = $result->fetch_assoc()) {
         $records['suppliers'][] = [
@@ -190,7 +193,8 @@ function readRecords(mysqli $db): array
                 u.full_name AS receiver_name
          FROM stock_receipts r JOIN inventory_items i ON i.id = r.item_id
          LEFT JOIN suppliers s ON s.id = r.supplier_id
-         LEFT JOIN users u ON u.id = r.received_by ORDER BY r.created_at, r.id'
+         LEFT JOIN users u ON u.id = r.received_by
+         ORDER BY CAST(SUBSTRING_INDEX(r.id, "-", -1) AS UNSIGNED) DESC, r.id DESC'
     );
     while ($row = $result->fetch_assoc()) {
         $records['receipts'][] = [
@@ -209,7 +213,8 @@ function readRecords(mysqli $db): array
                 COALESCE(x.issuance_date, DATE(x.created_at)) AS issue_date
          FROM stock_issuances x JOIN inventory_items i ON i.id = x.item_id
          JOIN stock_requests r ON r.id = x.request_id
-         LEFT JOIN users u ON u.id = x.handled_by ORDER BY x.created_at, x.id'
+         LEFT JOIN users u ON u.id = x.handled_by
+         ORDER BY CAST(SUBSTRING_INDEX(x.id, "-", -1) AS UNSIGNED) DESC, x.id DESC'
     );
     while ($row = $result->fetch_assoc()) {
         $records['issuances'][] = [
@@ -235,21 +240,50 @@ function outputRecord(mysqli $db, string $resource, string $id): ?array
     return null;
 }
 
+function generateRecordId(mysqli $db, string $resource): string
+{
+    $config = [
+        'items' => ['inventory_items', 'ITM-', 8],
+        'requests' => ['stock_requests', 'REQ-2026-', 44],
+        'suppliers' => ['suppliers', 'SUP-', 3],
+        'receipts' => ['stock_receipts', 'RCV-2026-', 27],
+        'issuances' => ['stock_issuances', 'ISS-2026-', 20]
+    ];
+    if (!isset($config[$resource])) {
+        throw new InvalidArgumentException('The record type is invalid.');
+    }
+    [$table, $prefix, $initialValue] = $config[$resource];
+    $maximum = $initialValue;
+    $result = $db->query("SELECT id FROM `{$table}`");
+    while ($row = $result->fetch_assoc()) {
+        if (preg_match('/^' . preg_quote($prefix, '/') . '(\d+)$/', (string) $row['id'], $match)) {
+            $maximum = max($maximum, (int) $match[1]);
+        }
+    }
+    return $prefix . str_pad((string) ($maximum + 1), 3, '0', STR_PAD_LEFT);
+}
+
 function saveOperation(mysqli $db, array $user, array $body): array
 {
     $resource = $body['resource'] ?? '';
     $record = $body['record'] ?? null;
     if (!in_array($resource, ['items', 'requests', 'suppliers', 'receipts', 'issuances'], true)
-        || !is_array($record) || !isset($record['id']) || !is_string($record['id'])) {
-        throw new InvalidArgumentException('A valid record type and ID are required.');
-    }
-    $id = trim($record['id']);
-    if ($id === '' || strlen($id) > 100) {
-        throw new InvalidArgumentException('The record ID is invalid.');
+        || !is_array($record)) {
+        throw new InvalidArgumentException('A valid record type and record details are required.');
     }
 
-    $db->begin_transaction();
+    $lockName = 'cbsua_supply_office_id_' . $resource;
+    $lock = $db->prepare('SELECT GET_LOCK(?, 10) AS acquired');
+    $lock->bind_param('s', $lockName);
+    $lock->execute();
+    if ((int) $lock->get_result()->fetch_assoc()['acquired'] !== 1) {
+        throw new RuntimeException('A unique record ID could not be reserved. Please try again.');
+    }
+
     try {
+        $id = generateRecordId($db, $resource);
+        $db->begin_transaction();
+        try {
         if ($resource === 'items') {
             $name = requiredText($record, 'name', 'Item name');
             $category = trim((string) ($record['category'] ?? ''));
@@ -361,7 +395,7 @@ function saveOperation(mysqli $db, array $user, array $body): array
                 throw new InvalidArgumentException('The issue quantity exceeds the remaining request or available stock.');
             }
             $issueDate = cleanDate($record['date'] ?? '', 'issuance date', false);
-            $office = $request['office'];
+            $office = requiredText($record, 'office', 'Office');
             $recipient = $request['recipient'];
             $handledBy = (int) $user['id'];
             $recipientEmployeeId = $request['employee_id'] ?? '';
@@ -388,9 +422,14 @@ function saveOperation(mysqli $db, array $user, array $body): array
             }
         }
         $db->commit();
-    } catch (Throwable $error) {
-        $db->rollback();
-        throw $error;
+        } catch (Throwable $error) {
+            $db->rollback();
+            throw $error;
+        }
+    } finally {
+        $release = $db->prepare('SELECT RELEASE_LOCK(?)');
+        $release->bind_param('s', $lockName);
+        $release->execute();
     }
 
     $saved = outputRecord($db, $resource, $id);

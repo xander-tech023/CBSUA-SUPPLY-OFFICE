@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const {
     getLocalRecords, saveRecord, updateRequestStatus, updateInventoryItem, updateSupplier, addInventoryRow,
-    addRequestRow, addSupplierCard, nextRecordId
+    addRequestRow, addSupplierCard
   } = window.IMS;
   const modalId = {
     'inventory.html': 'addItemModal',
@@ -65,12 +65,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const today = new Date();
       today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
       if (requestForm) {
-        requestForm.querySelector('#requestId').value = nextRecordId('requests', 'REQ-2026-', 44);
         requestForm.querySelector('#requestDate').value = today.toISOString().slice(0, 10);
       }
-    }
-    if (pageModal.id === 'supplierModal' && !pageModal.querySelector('#supplierForm').dataset.editingSupplier) {
-      pageModal.querySelector('#supplierForm input').value = nextRecordId('suppliers', 'SUP-', 3);
     }
     pageModal.classList.remove('hidden');
     const dialog = pageModal.firstElementChild;
@@ -91,8 +87,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     form.reset();
     delete form.dataset.editingItem;
     delete form.dataset.editingSupplier;
-    const idField = form.querySelector('input');
-    if (idField) idField.readOnly = form.id === 'supplierForm';
     const heading = form.closest('.fixed')?.querySelector('h3');
     if (heading) {
       heading.textContent = form.id === 'addItemForm'
@@ -535,18 +529,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const fields = [...form.querySelectorAll('input, select, textarea')];
         const modal = document.getElementById('addItemModal');
         const heading = modal.querySelector('h3');
-        fields[0].value = item.id;
-        fields[1].value = item.name;
-        fields[2].value = item.description || '';
-        fields[3].value = [...fields[3].options].find(option => option.textContent.includes(item.category))?.value || fields[3].options[0].value;
-        fields[4].value = [...fields[4].options].find(option => option.textContent.includes(item.supplier))?.value || fields[4].options[0].value;
-        fields[5].value = item.unit;
-        fields[6].value = item.minimum;
-        fields[7].value = item.quantity;
-        fields[8].value = item.expiry || '';
-        fields[0].readOnly = true;
-        fields[7].readOnly = true;
-        fields[7].previousElementSibling.textContent = 'On-hand quantity (adjust via receiving / issuance)';
+        fields[0].value = item.name;
+        fields[1].value = item.description || '';
+        fields[2].value = [...fields[2].options].find(option => option.textContent.includes(item.category))?.value || fields[2].options[0].value;
+        fields[3].value = [...fields[3].options].find(option => option.textContent.includes(item.supplier))?.value || fields[3].options[0].value;
+        fields[4].value = item.unit;
+        fields[5].value = item.minimum;
+        fields[6].value = item.quantity;
+        fields[7].value = item.expiry || '';
+        fields[6].readOnly = true;
+        fields[6].previousElementSibling.textContent = 'On-hand quantity (adjust via receiving / issuance)';
         heading.textContent = `Inspect / edit ${item.id}`;
         form.dataset.editingItem = item.id;
         return openModal(target);
@@ -556,9 +548,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const form = document.getElementById('supplierForm');
         if (!supplier || !form) return showToast('The supplier could not be found.');
         const fields = [...form.querySelectorAll('input, select, textarea')];
-        [supplier.id, supplier.name, supplier.category, supplier.contact, supplier.phone, supplier.email, supplier.address]
+        [supplier.name, supplier.category, supplier.contact, supplier.phone, supplier.email, supplier.address]
           .forEach((value, index) => { fields[index].value = value || ''; });
-        fields[0].readOnly = true;
         form.dataset.editingSupplier = supplier.id;
         document.querySelector('#supplierModal h3').textContent = `Edit ${supplier.name}`;
         return openModal(target);
@@ -675,21 +666,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       event.stopImmediatePropagation();
       if (form.id === 'addItemForm') {
         const fields = [...form.querySelectorAll('input, select, textarea')];
-        const minimum = Number(fields[6].value);
-        const quantity = Number(fields[7].value);
+        const minimum = Number(fields[5].value);
+        const quantity = Number(fields[6].value);
         if (!Number.isSafeInteger(minimum) || minimum < 0 || !Number.isSafeInteger(quantity) || quantity < 0) {
           return showToast('Stock quantities must be whole numbers greater than or equal to zero.');
         }
         const item = {
-          id: fields[0].value.trim().toUpperCase(), name: fields[1].value.trim(),
-          description: fields[2].value.trim(), category: fields[3].selectedOptions[0].textContent.split(' — ').slice(1).join(' — '),
-          supplier: fields[4].selectedOptions[0].textContent.split(' — ').slice(1).join(' — '), unit: fields[5].value.trim(),
-          minimum, quantity, expiry: fields[8].value
+          name: fields[0].value.trim(), description: fields[1].value.trim(),
+          category: fields[2].selectedOptions[0].textContent.split(' — ').slice(1).join(' — '),
+          supplier: fields[3].selectedOptions[0].textContent.split(' — ').slice(1).join(' — '),
+          unit: fields[4].value.trim(), minimum, quantity, expiry: fields[7].value
         };
         const itemIdBeingEdited = form.dataset.editingItem;
-        if (!itemIdBeingEdited && getLocalRecords('items').some(savedItem => savedItem.id === item.id)) {
-          return showToast(`${item.id} already exists in this inventory.`);
-        }
         const savedItem = itemIdBeingEdited
           ? await updateInventoryItem(itemIdBeingEdited, item)
           : await saveRecord('items', item);
@@ -697,14 +685,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         addInventoryRow(savedItem);
         document.querySelector('#searchInput')?.dispatchEvent(new Event('input', { bubbles: true }));
         form.reset();
-        fields[0].readOnly = false;
-        fields[7].readOnly = false;
-        fields[7].previousElementSibling.textContent = 'Opening quantity *';
+        fields[6].readOnly = false;
+        fields[6].previousElementSibling.textContent = 'Opening quantity *';
         delete form.dataset.editingItem;
         document.querySelector('#addItemModal h3').textContent = 'Add a new inventory item';
         closeModal();
         window.IMS.refreshPage();
-        return showToast(`${item.id} ${itemIdBeingEdited ? 'updated' : 'saved'} successfully.`);
+        return showToast(`${savedItem.id} ${itemIdBeingEdited ? 'updated' : 'saved'} successfully.`);
       }
       if (form.id === 'requestForm') {
         const itemId = form.querySelector('#requestItem').value;
@@ -714,7 +701,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           return showToast('Choose an item and enter a whole-number quantity greater than zero.');
         }
         const request = {
-          id: form.querySelector('#requestId').value.trim(),
           date: form.querySelector('#requestDate').value,
           office: form.querySelector('#requestOffice').value,
           recipient: form.querySelector('#requestRecipient').value.trim(),
@@ -728,27 +714,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!/^[A-Z0-9-]{3,24}$/.test(request.employeeId)) {
           return showToast('Enter an employee ID using 3–24 letters, numbers, or hyphens.');
         }
-        if (getLocalRecords('requests').some(savedRequest => savedRequest.id === request.id)) {
-          return showToast(`${request.id} already exists.`);
-        }
         const savedRequest = await saveRecord('requests', request);
         if (!savedRequest) return;
         form.reset();
         form.closest('.fixed')?.classList.add('hidden');
         window.IMS.refreshPage();
-        return showToast(`${request.id} saved successfully as pending.`);
+        return showToast(`${savedRequest.id} saved successfully as pending.`);
       }
       if (form.id === 'supplierForm') {
         const fields = [...form.querySelectorAll('input, select, textarea')];
         const supplier = {
-          id: fields[0].value.trim(), name: fields[1].value.trim(), category: fields[2].value.trim(),
-          contact: fields[3].value.trim(), phone: fields[4].value.trim(), email: fields[5].value.trim(), address: fields[6].value.trim()
+          name: fields[0].value.trim(), category: fields[1].value.trim(),
+          contact: fields[2].value.trim(), phone: fields[3].value.trim(), email: fields[4].value.trim(), address: fields[5].value.trim()
         };
         const supplierBeingEdited = form.dataset.editingSupplier;
         if (getLocalRecords('suppliers').some(entry =>
           entry.id !== supplierBeingEdited
-          && (entry.id === supplier.id || entry.name.toLowerCase() === supplier.name.toLowerCase()))) {
-          return showToast('A supplier with this ID or name already exists.');
+          && entry.name.toLowerCase() === supplier.name.toLowerCase())) {
+          return showToast('A supplier with this name already exists.');
         }
         const savedSupplier = supplierBeingEdited
           ? await updateSupplier(supplierBeingEdited, supplier)
@@ -757,16 +740,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (supplierBeingEdited) window.IMS.refreshPage();
         else {
           addSupplierCard(savedSupplier);
-          fields[0].value = nextRecordId('suppliers', 'SUP-', 3);
           const list = document.querySelector('main .space-y-4');
           const count = [...document.querySelectorAll('main p')].find(paragraph => paragraph.textContent.includes('supplier records'));
           if (count && list) count.textContent = `${list.children.length} suppliers`;
           window.IMS.refreshPage();
         }
         resetModalForm(form);
-        if (form.id === 'supplierForm') fields[0].value = nextRecordId('suppliers', 'SUP-', 3);
         closeModal();
-        return showToast(`${supplier.name} ${supplierBeingEdited ? 'updated' : 'saved'} successfully.`);
+        return showToast(`${savedSupplier.id} — ${supplier.name} ${supplierBeingEdited ? 'updated' : 'saved'} successfully.`);
       }
       if (form.id === 'receiveForm') {
         const quantity = Number(form.querySelector('#receiveQuantity').value);
@@ -779,7 +760,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           return showToast('This delivery reference has already been recorded.');
         }
         const receipt = {
-          id: nextRecordId('receipts', 'RCV-2026-', 27),
           supplier: form.querySelector('#receiveSupplier').selectedOptions[0].textContent.split(' — ').slice(1).join(' — '),
           deliveryReference, itemId, itemName: item.name,
           quantity,
@@ -799,7 +779,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
         form.querySelector('#receivedDate').value = today.toISOString().slice(0, 10);
         window.IMS.refreshPage?.();
-        return showToast(`Saved successfully and supply record updated.`);
+        return showToast(`${savedReceipt.id} saved successfully and supply record updated.`);
       }
       if (form.id === 'issueForm') {
         const requestId = form.querySelector('#issueRequest').value;
@@ -814,9 +794,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (!document.querySelector('#issueConfirmed').checked) return showToast('Confirm the recipient and physical quantity before issuing.');
         const issuance = {
-          id: nextRecordId('issuances', 'ISS-2026-', 20), requestId,
+          requestId,
           itemId, itemName: item.name, quantity,
-          office: request.office, recipient: form.querySelector('#issueRecipient').value,
+          office: form.querySelector('#issueOffice').value.trim(), recipient: form.querySelector('#issueRecipient').value,
           recipientEmployeeId: request.employeeId || '',
           date: form.querySelector('#issueDate').value, handledBy: `${currentUser.name} — ${currentUser.title}`,
           remarks: form.querySelector('textarea')?.value.trim() || ''
@@ -826,7 +806,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.dispatchEvent(new CustomEvent('ims:issuance-saved', { detail: savedIssuance }));
         form.reset();
         window.IMS.refreshPage?.();
-        return showToast(`${issuance.id} saved successfully and stock balance updated.`);
+        return showToast(`${savedIssuance.id} saved successfully and stock balance updated.`);
       }
     }, true);
   }
