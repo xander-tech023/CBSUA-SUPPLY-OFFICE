@@ -120,6 +120,7 @@ window.IMS.pageFeatures.push(() => {
   selects.forEach(select => select.addEventListener('change', update));
   window.addEventListener('ims:records-updated', update);
   window.addEventListener('ims:records-updated', refreshSuppliers);
+  refreshSuppliers();
   filterButtons.forEach(button => button.addEventListener('click', () => {
     const label = button.textContent.split('·')[0].trim();
     statusFilter = label === 'All items' ? '' : label.toLowerCase();
