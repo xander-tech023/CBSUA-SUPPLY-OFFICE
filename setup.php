@@ -187,8 +187,8 @@ try {
         'UPDATE users SET username = ?, password_hash = ?, full_name = ?, title = ?, is_active = 1 WHERE role = ?'
     );
     foreach ([
-        ['admin', 'admin', 'admin123', 'Renjene D.S. Rivera', 'Head, Supply Office'],
-        ['staff', 'staff', 'staff123', 'Maria Santos', 'Supply Staff Officer']
+        ['admin', 'admin', 'admin123', 'Jo-Ann Michelle Dio', 'OIC, Supply Officer'],
+        ['staff', 'staff', 'staff123', 'Jezrel Oribiana', 'Supply Staff Officer']
     ] as [$role, $username, $password, $name, $title]) {
         $findUser->bind_param('s', $role);
         $findUser->execute();
