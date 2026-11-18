@@ -4,6 +4,137 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
 (() => {
   const resources = ['items', 'requests', 'suppliers', 'receipts', 'issuances'];
   const records = Object.fromEntries(resources.map(resource => [resource, []]));
+  const storageKey = 'cbsuaSupplyRecords';
+  const seedRecords = {
+    items: [
+      { id: 'ITM-001', name: 'Bond paper, A4', description: '', category: 'Paper supplies', quantity: 18, unit: 'reams', supplier: 'Bicol Office Depot', minimum: 20, expiry: null, status: 'Low stock' },
+      { id: 'ITM-002', name: 'Bond paper, letter', description: '', category: 'Paper supplies', quantity: 240, unit: 'reams', supplier: 'Bicol Office Depot', minimum: 50, expiry: null, status: 'In stock' },
+      { id: 'ITM-003', name: 'Ballpen per pack', description: '', category: 'Writing tools', quantity: 24, unit: 'pieces', supplier: 'Bicol Office Depot', minimum: 10, expiry: null, status: 'In stock' },
+      { id: 'ITM-004', name: 'Toner cartridge', description: '', category: 'Printing', quantity: 12, unit: 'cartridges', supplier: 'Sipocot Print Supply', minimum: 5, expiry: null, status: 'In stock' },
+      { id: 'ITM-005', name: 'Ethyl alcohol, 500 mL', description: '', category: 'Cleaning', quantity: 36, unit: 'bottles', supplier: 'Camarines Essentials', minimum: 10, expiry: null, status: 'In stock' },
+      { id: 'ITM-008', name: 'Whiteboard marker', description: '', category: 'Writing tools', quantity: 0, unit: 'pieces', supplier: 'Bicol Office Depot', minimum: 10, expiry: null, status: 'Out of stock' }
+    ],
+    suppliers: [
+      { id: 'SUP-001', name: 'Bicol Office Depot', category: 'Office & school supplies, paper, stationery', contact: 'Maria Cruz — Procurement', phone: '0917-XXX-XXXX', email: 'bod@example.ph', address: 'National Highway, Sipocot, Camarines Sur', items: 4, deliveries: 0 },
+      { id: 'SUP-002', name: 'Sipocot Print Supply', category: 'Printers, toner, ink, printing services', contact: 'Juan Reyes — Manager', phone: '0918-XXX-XXXX', email: 'sps@example.ph', address: 'Barangay San Vicente, Sipocot, Camarines Sur', items: 1, deliveries: 0 },
+      { id: 'SUP-003', name: 'Camarines Essentials', category: 'Medical, hygiene, cleaning supplies', contact: 'Ana Santos — Sales Officer', phone: '0915-XXX-XXXX', email: 'ce@example.ph', address: 'Centro, Sipocot, Camarines Sur', items: 1, deliveries: 0 }
+    ],
+    requests: [
+      {
+        id: 'REQ-2026-045',
+        date: '2026-11-18',
+        office: 'College of Education',
+        recipient: 'Angelica Ramos',
+        employeeId: 'CBSUA-1042',
+        item: 'Bond paper, A4 (ITM-001)',
+        itemId: 'ITM-001',
+        quantity: '10 reams',
+        status: 'Pending',
+        reviewedBy: '',
+        reviewedAt: null,
+        remarks: 'For instructional materials and examination packets.',
+        createdAt: '2026-11-18T08:30:00'
+      },
+      {
+        id: 'REQ-2026-044',
+        date: '2026-11-17',
+        office: 'Registrar',
+        recipient: 'Noel P. Mendoza',
+        employeeId: 'CBSUA-0831',
+        item: 'Ballpen per pack (ITM-003)',
+        itemId: 'ITM-003',
+        quantity: '4 pieces',
+        status: 'Approved',
+        reviewedBy: 'Renjene D.S. Rivera',
+        reviewedAt: '2026-11-17T14:20:00',
+        remarks: 'Office writing supplies.',
+        createdAt: '2026-11-17T09:10:00'
+      },
+      {
+        id: 'REQ-2026-043',
+        date: '2026-11-15',
+        office: 'Campus Health Services',
+        recipient: 'Liza Marie Cruz',
+        employeeId: 'CBSUA-0674',
+        item: 'Ethyl alcohol, 500 mL (ITM-005)',
+        itemId: 'ITM-005',
+        quantity: '6 bottles',
+        status: 'Issued',
+        reviewedBy: 'Renjene D.S. Rivera',
+        reviewedAt: '2026-11-15T11:05:00',
+        remarks: 'Sanitation supplies.',
+        createdAt: '2026-11-15T08:45:00'
+      }
+    ],
+    receipts: [
+      {
+        id: 'RCV-2026-028',
+        itemId: 'ITM-001',
+        itemName: 'Bond paper, A4',
+        quantity: 20,
+        unit: 'reams',
+        supplier: 'Bicol Office Depot',
+        supplierId: 'SUP-001',
+        receivedBy: 'Maria Santos — Supply Staff Officer',
+        receivedDate: '2026-11-14',
+        deliveryReference: 'DR-2026-184',
+        batchNumber: 'BOD-A4-1114',
+        expiryDate: null,
+        remarks: 'Standard office delivery.',
+        attachmentName: 'delivery-receipt-184.pdf',
+        createdAt: '2026-11-14T10:15:00'
+      },
+      {
+        id: 'RCV-2026-027',
+        itemId: 'ITM-005',
+        itemName: 'Ethyl alcohol, 500 mL',
+        quantity: 12,
+        unit: 'bottles',
+        supplier: 'Camarines Essentials',
+        supplierId: 'SUP-003',
+        receivedBy: 'Maria Santos — Supply Staff Officer',
+        receivedDate: '2026-11-12',
+        deliveryReference: 'DR-2026-179',
+        batchNumber: 'CE-ALC-1112',
+        expiryDate: '2027-11-12',
+        remarks: 'Checked and recorded.',
+        attachmentName: '',
+        createdAt: '2026-11-12T13:40:00'
+      }
+    ],
+    issuances: [
+      {
+        id: 'ISS-2026-021',
+        requestId: 'REQ-2026-043',
+        itemId: 'ITM-005',
+        itemName: 'Ethyl alcohol, 500 mL',
+        quantity: 6,
+        unit: 'bottles',
+        office: 'Campus Health Services',
+        recipient: 'Liza Marie Cruz',
+        recipientEmployeeId: 'CBSUA-0674',
+        handledBy: 'Maria Santos — Supply Staff Officer',
+        date: '2026-11-15',
+        remarks: 'Issued for clinic sanitation use.',
+        createdAt: '2026-11-15T13:30:00'
+      },
+      {
+        id: 'ISS-2026-020',
+        requestId: 'REQ-2026-044',
+        itemId: 'ITM-003',
+        itemName: 'Ballpen per pack',
+        quantity: 2,
+        unit: 'pieces',
+        office: 'Registrar',
+        recipient: 'Noel P. Mendoza',
+        recipientEmployeeId: 'CBSUA-0831',
+        handledBy: 'Maria Santos — Supply Staff Officer',
+        date: '2026-11-17',
+        remarks: 'Partial issue recorded.',
+        createdAt: '2026-11-17T15:10:00'
+      }
+    ]
+  };
 
   function createElement(tag, className = '', text) {
     const element = document.createElement(tag);
@@ -43,31 +174,102 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
           : 'In stock';
   }
 
-  async function loadRecords() {
-    const response = await fetch('../api.php?action=records', { credentials: 'same-origin' });
-    const result = await response.json();
-    if (!response.ok || !result.ok) throw new Error(result.error || 'Records could not be loaded from the database.');
-    for (const resource of resources) {
-      records[resource] = Array.isArray(result.records?.[resource]) ? result.records[resource] : [];
+  function readStoredRecords() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(storageKey));
+      if (stored && resources.every(resource => Array.isArray(stored[resource]))) return stored;
+    } catch {
+      // Fall back to starter records when browser storage is unavailable or invalid.
     }
+    return structuredClone(seedRecords);
+  }
+
+  function persistRecords() {
+    localStorage.setItem(storageKey, JSON.stringify(records));
+  }
+
+  async function loadRecords() {
+    const stored = readStoredRecords();
+    for (const resource of resources) {
+      records[resource] = stored[resource].map(record => ({ ...record }));
+    }
+  }
+
+  function replaceStoredResource(resource, record, recordId) {
+    const index = records[resource].findIndex(entry => entry.id === recordId);
+    if (index >= 0) records[resource][index] = record;
+    else records[resource].push(record);
   }
 
   async function runMutation(action, payload) {
     try {
-      const response = await fetch('../api.php', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...payload })
-      });
-      const result = await response.json();
-      if (!response.ok || !result.ok) throw new Error(result.error || 'The record could not be saved to the database.');
-      await loadRecords();
+      let result = true;
+      if (action === 'save-record') {
+        const { resource, record } = payload;
+        if (!resources.includes(resource)) throw new Error('A valid record type is required.');
+        const saved = structuredClone(record);
+
+        if (resource === 'items') {
+          updateInventoryStatus(saved);
+        } else if (resource === 'receipts') {
+          const item = records.items.find(entry => entry.id === saved.itemId);
+          if (!item) throw new Error('Choose a valid inventory item.');
+          item.quantity += Number(saved.quantity);
+          if (saved.expiryDate) item.expiry = saved.expiryDate;
+          updateInventoryStatus(item);
+        } else if (resource === 'issuances') {
+          const item = records.items.find(entry => entry.id === saved.itemId);
+          const request = records.requests.find(entry => entry.id === saved.requestId);
+          if (!item || !request || request.status !== 'Approved') throw new Error('Choose an approved request.');
+          if (getRemainingRequestQuantity(request) < Number(saved.quantity) || item.quantity < Number(saved.quantity)) {
+            throw new Error('The issue quantity exceeds the remaining request or available stock.');
+          }
+          item.quantity -= Number(saved.quantity);
+          updateInventoryStatus(item);
+          if (getRemainingRequestQuantity(request) - Number(saved.quantity) <= 0) request.status = 'Issued';
+        }
+        replaceStoredResource(resource, saved);
+        result = saved;
+      } else if (action === 'update-record') {
+        const { resource, recordId, changes } = payload;
+        if (resource === 'items') {
+          const item = records.items.find(entry => entry.id === recordId);
+          if (!item) throw new Error('The inventory item could not be found.');
+          Object.assign(item, changes);
+          updateInventoryStatus(item);
+          result = item;
+        } else if (resource === 'suppliers') {
+          const supplier = records.suppliers.find(entry => entry.id === recordId);
+          if (!supplier) throw new Error('The supplier could not be found.');
+          Object.assign(supplier, changes);
+          result = supplier;
+        } else {
+          throw new Error('The record update is invalid.');
+        }
+      } else if (action === 'update-request-status') {
+        if (window.IMS.currentUser?.role !== 'admin') throw new Error('Only the Supply Office head can review requests.');
+        const request = records.requests.find(entry => entry.id === payload.requestId);
+        if (!request || request.status !== 'Pending') throw new Error('This request is no longer awaiting review.');
+        if (payload.status === 'Approved') {
+          const item = records.items.find(entry => entry.id === request.itemId);
+          if (!item || Number.parseFloat(request.quantity) > item.quantity) {
+            throw new Error('There is not enough stock to approve this request.');
+          }
+        }
+        if (!['Approved', 'Rejected'].includes(payload.status)) throw new Error('Choose a valid request status.');
+        request.status = payload.status;
+        request.reviewedBy = window.IMS.currentUser.name;
+        request.reviewedAt = new Date().toISOString();
+        result = true;
+      } else {
+        throw new Error('Unknown action.');
+      }
+      persistRecords();
       window.dispatchEvent(new CustomEvent('ims:records-updated'));
-      return result.record || true;
+      return result;
     } catch (error) {
-      console.error('Database record operation failed.', error);
-      window.IMS.showToast(error.message || 'The record could not be saved to the database.');
+      console.error('Local record operation failed.', error);
+      window.IMS.showToast(error.message || 'The record could not be saved.');
       return null;
     }
   }
@@ -288,6 +490,19 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
 
   function restoreLocalRecords() {
     const currentPage = location.pathname.split('/').pop();
+    if (currentPage === 'suppliers.html') {
+      const suppliers = getLocalRecords('suppliers');
+      const countElements = [...document.querySelectorAll('main p')];
+      const recordCount = countElements.find(paragraph => paragraph.textContent.includes('supplier records'));
+      if (recordCount) recordCount.textContent = `${suppliers.length} supplier records`;
+
+      const statValues = [...document.querySelectorAll('main .stat-card .flex.justify-between span:last-child')];
+      if (statValues[0]) statValues[0].textContent = String(suppliers.length);
+      if (statValues[1]) statValues[1].textContent = String(suppliers.length);
+      if (statValues[2]) statValues[2].textContent = String(getLocalRecords('items').filter(item =>
+        suppliers.some(supplier => supplier.name === item.supplier)).length);
+      if (statValues[3]) statValues[3].textContent = String(getLocalRecords('receipts').length);
+    }
     if (currentPage === 'dashboard.html') {
       [['receipts', 'Received'], ['issuances', 'Issued']]
         .flatMap(([resource, type]) => getLocalRecords(resource).map(record => [record, type]))

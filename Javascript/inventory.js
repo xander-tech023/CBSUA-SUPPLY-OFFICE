@@ -26,6 +26,7 @@ window.IMS.pageFeatures.push(() => {
   const filterButtons = [...document.querySelectorAll('main button')]
     .filter(button => /^(All items|In stock|Low stock|Out of stock|Expiring soon)/.test(button.textContent.trim()));
   const supplierSelect = document.querySelectorAll('#addItemForm select')[1];
+  const supplierFilter = selects[1];
   const card = table.closest('.stat-card');
   const pagination = card?.querySelector('.flex.gap-2');
   const summary = card?.querySelector('p');
@@ -102,17 +103,34 @@ window.IMS.pageFeatures.push(() => {
   }
 
   function refreshSuppliers() {
-    if (!supplierSelect) return;
-    const previousValue = supplierSelect.value;
-    supplierSelect.replaceChildren();
+    if (supplierSelect) {
+      const previousValue = supplierSelect.value;
+      supplierSelect.replaceChildren();
+      getLocalRecords('suppliers').forEach(supplier => {
+        const option = document.createElement('option');
+        option.value = supplier.id;
+        option.textContent = `${supplier.id} — ${supplier.name}`;
+        supplierSelect.append(option);
+      });
+      if ([...supplierSelect.options].some(option => option.value === previousValue)) {
+        supplierSelect.value = previousValue;
+      }
+    }
+
+    if (!supplierFilter) return;
+    const previousFilter = supplierFilter.value;
+    supplierFilter.replaceChildren();
+    const allOption = document.createElement('option');
+    allOption.textContent = 'All suppliers';
+    supplierFilter.append(allOption);
     getLocalRecords('suppliers').forEach(supplier => {
       const option = document.createElement('option');
-      option.value = supplier.id;
       option.textContent = `${supplier.id} — ${supplier.name}`;
-      supplierSelect.append(option);
+      option.value = supplier.name;
+      supplierFilter.append(option);
     });
-    if ([...supplierSelect.options].some(option => option.value === previousValue)) {
-      supplierSelect.value = previousValue;
+    if ([...supplierFilter.options].some(option => option.value === previousFilter)) {
+      supplierFilter.value = previousFilter;
     }
   }
 
@@ -142,5 +160,6 @@ window.IMS.pageFeatures.push(() => {
     update();
     refreshSuppliers();
   });
+  refreshSuppliers();
   update();
 });

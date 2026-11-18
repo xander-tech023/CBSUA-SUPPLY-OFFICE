@@ -32,10 +32,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     await window.IMS.initializeRecords();
     window.dispatchEvent(new CustomEvent('ims:records-updated'));
   } catch (error) {
-    console.error('The XAMPP workspace could not be initialized.', error);
+    console.error('The workspace could not be initialized.', error);
     const message = document.createElement('p');
     message.className = 'mx-auto mt-12 max-w-xl rounded-lg bg-red-50 p-5 text-red-800';
-    message.textContent = 'Could not connect to the XAMPP database. Start Apache and MySQL in XAMPP, finish setup, and reload this page.';
+    message.textContent = 'Could not initialize the local workspace. Reload this page and try again.';
     document.body.replaceChildren(message);
     return;
   }
@@ -425,7 +425,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     dialogDescription.textContent = 'CBSUA Supply Office Inventory Management System';
     dialogContent.replaceChildren();
     [
-      'Use the workspace menu to move between the Dashboard, Inventory, Stock Requests, Issue Supplies, Receive Stock, and Suppliers. Inventory items, requests, suppliers, and stock movements are saved in the XAMPP database.',
+      'Use the workspace menu to move between the Dashboard, Inventory, Stock Requests, Issue Supplies, Receive Stock, and Suppliers. Inventory items, requests, suppliers, and stock movements are saved locally in this browser.',
       'For account access, password resets, or operational support, contact the Supply Office in person.'
     ].forEach(text => dialogContent.append(createElement('p', '', text)));
     dialogActions.replaceChildren();

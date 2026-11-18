@@ -1,52 +1,62 @@
 window.IMS = window.IMS || {};
 
 (() => {
-  const backendHint = 'Database login requires XAMPP. Start Apache and MySQL, then open http://localhost/CBSUA-SUPPLY-OFFICE/html/index.html instead of Live Server.';
+  const sessionKey = 'cbsuaSupplySession';
+  const accounts = {
+    admin: {
+      id: 1,
+      username: 'admin',
+      password: 'admin123',
+      name: 'Renjene D.S. Rivera',
+      title: 'Head, Supply Office',
+      role: 'admin'
+    },
+    staff: {
+      id: 2,
+      username: 'staff',
+      password: 'staff123',
+      name: 'Maria Santos',
+      title: 'Supply Staff Officer',
+      role: 'staff'
+    }
+  };
 
-  async function readResponse(response) {
-    if (!response.headers.get('content-type')?.toLowerCase().includes('application/json')) {
-      throw new Error(backendHint);
-    }
+  function readSession() {
     try {
-      return await response.json();
+      return JSON.parse(sessionStorage.getItem(sessionKey) || localStorage.getItem(sessionKey) || 'null');
     } catch {
-      throw new Error(`The XAMPP login API returned an invalid response. ${backendHint}`);
+      return null;
     }
-  }
-
-  async function request(action, payload = {}) {
-    let response;
-    try {
-      response = await fetch('../api.php', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...payload })
-      });
-    } catch {
-      throw new Error(backendHint);
-    }
-    const result = await readResponse(response);
-    if (!response.ok || !result.ok) {
-      throw new Error(result.error || 'The server could not complete the request.');
-    }
-    return result;
   }
 
   window.IMS.accounts = {
-    login: (role, username, password, remember) => request('login', { role, username, password, remember }),
-    async getSession() {
-      let response;
-      try {
-        response = await fetch('../api.php?action=session', { credentials: 'same-origin' });
-      } catch {
-        throw new Error(backendHint);
+    async login(role, username, password, remember) {
+      const account = accounts[role];
+      if (!account || account.username !== username || account.password !== password) {
+        throw new Error('Username or password is incorrect for the selected workspace.');
       }
-      const result = await readResponse(response);
-      if (response.status === 401) return null;
-      if (!response.ok || !result.ok) throw new Error(result.error || 'The session could not be checked.');
-      return result.user;
+      const user = {
+        id: account.id,
+        username: account.username,
+        name: account.name,
+        title: account.title,
+        role: account.role
+      };
+      sessionStorage.setItem(sessionKey, JSON.stringify(user));
+      if (remember) {
+        localStorage.setItem(sessionKey, JSON.stringify(user));
+      } else {
+        localStorage.removeItem(sessionKey);
+      }
+      return { ok: true, user };
     },
-    logout: () => request('logout')
+    async getSession() {
+      return readSession();
+    },
+    async logout() {
+      sessionStorage.removeItem(sessionKey);
+      localStorage.removeItem(sessionKey);
+      return { ok: true };
+    }
   };
 })();
