@@ -1,21 +1,20 @@
-# XAMPP database setup
+# CBSUA Supply Office database
 
-The `schema.sql` file contains the MySQL/MariaDB tables used by the CBSUA Supply Office app. It creates the default `cbsua_supply_office` database and can be imported with phpMyAdmin or the MySQL command line.
+## Run in MySQL Workbench
 
-## Recommended setup
+1. Open MySQL Workbench and connect to MySQL 8.0 or MariaDB/MySQL-compatible server used by XAMPP.
+2. Open `database/schema.sql` using **File > Open SQL Script**.
+3. Confirm the connection is selected, then click the lightning-bolt **Execute** button.
+4. The script creates `cbsua_supply_office`, all application tables, foreign keys, and seed account rows.
+5. In XAMPP, open `http://localhost/CBSUA-SUPPLY-OFFICE/setup.php` once. It replaces placeholder password hashes with working PHP password hashes and adds starter inventory. Then delete `setup.php`.
 
-1. Copy the project to `C:\xampp\htdocs\CBSUA-SUPPLY-OFFICE` and start Apache and MySQL in the XAMPP Control Panel.
-2. Open `http://localhost/CBSUA-SUPPLY-OFFICE/setup.php`. This creates the database and tables, then seeds the initial admin/staff accounts and sample suppliers and inventory.
-3. Delete `setup.php` after setup succeeds, then open `http://localhost/CBSUA-SUPPLY-OFFICE/html/index.html`.
+You can also import the script using **Server > Data Import** or copy/paste it into a Workbench SQL tab and execute it.
 
-## Import the SQL schema directly
+## Login accounts
 
-In phpMyAdmin (`http://localhost/phpmyadmin`), choose **Import**, select `database/schema.sql`, and run it. Alternatively, from a terminal in the project directory run:
+| Workspace | Username | Password |
+|---|---|---|
+| Admin | `admin` | `admin123` |
+| Staff | `staff` | `staff123` |
 
-```sh
-mysql -u root < database/schema.sql
-```
-
-The schema is for structure only; it does not insert login accounts or sample inventory. After importing it, visit `http://localhost/CBSUA-SUPPLY-OFFICE/setup.php` once so the app's initial accounts and starter data are created. The default XAMPP connection is `127.0.0.1:3306`, database `cbsua_supply_office`, user `root`, and an empty password; edit `db_config.php` or set its documented environment variables if your local setup differs.
-
-The setup script is intended for local development. Delete it after running, and change the default passwords before using the app beyond a local test environment.
+Do not run the schema against a production database. It is intended for local XAMPP/MySQL Workbench setup.
