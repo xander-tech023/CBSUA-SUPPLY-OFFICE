@@ -57,9 +57,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   }[currentPage];
   const pageModal = modalId ? document.getElementById(modalId) : null;
   let modalOpener = null;
+  let previousBodyOverflowY = '';
   function openModal(opener) {
     if (!pageModal) return;
     modalOpener = opener || document.activeElement;
+    if (pageModal.classList.contains('hidden')) {
+      previousBodyOverflowY = document.body.style.overflowY;
+      document.body.style.overflowY = 'hidden';
+    }
     if (pageModal.id === 'requestModal') {
       const requestForm = pageModal.querySelector('#requestForm');
       const today = new Date();
@@ -84,6 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function closeModal() {
     if (!pageModal) return;
     pageModal.classList.add('hidden');
+    document.body.style.overflowY = previousBodyOverflowY;
     modalOpener?.focus();
   }
   function resetModalForm(form) {
@@ -741,7 +747,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const savedRequest = await saveRecord('requests', request);
         if (!savedRequest) return;
         form.reset();
-        form.closest('.fixed')?.classList.add('hidden');
+        closeModal();
         window.IMS.refreshPage();
         return showToast(`${request.id} saved successfully as pending.`);
       }
