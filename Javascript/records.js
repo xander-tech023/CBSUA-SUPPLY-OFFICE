@@ -523,8 +523,11 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     const supplierList = currentPage === 'suppliers.html' ? document.querySelector('main .space-y-4') : null;
     supplierList?.replaceChildren();
     const records = getLocalRecords(resource[0]);
-    (currentPage === 'stock_request.html' || currentPage === 'suppliers.html' ? [...records].reverse() : records)
-      .forEach(resource[1]);
+    const recordsForDisplay = currentPage === 'stock_request.html'
+      ? [...records].sort((left, right) =>
+        Number(left.id.match(/(\d+)$/)?.[1]) - Number(right.id.match(/(\d+)$/)?.[1]))
+      : records;
+    recordsForDisplay.forEach(resource[1]);
     const filter = currentPage === 'inventory.html' ? document.querySelector('#searchInput')
       : currentPage === 'stock_request.html' ? document.querySelector('main input[type="text"]') : null;
     filter?.dispatchEvent(new Event('input', { bubbles: true }));
