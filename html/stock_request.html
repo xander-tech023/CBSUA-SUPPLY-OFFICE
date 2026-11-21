@@ -104,7 +104,20 @@
       </div>
 
       <!-- Requests Table -->
-      <div class="stat-card mb-6">
+      <section id="adminRequestCards" class="mb-6 hidden" aria-label="Request approval cards">
+        <div class="stat-card">
+          <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between mb-4">
+            <div>
+              <h3 class="text-lg font-semibold">Request review</h3>
+              <p class="text-sm text-cbsua-muted">Review each request before approving or rejecting it.</p>
+            </div>
+            <p id="adminRequestCardSummary" class="text-sm text-cbsua-muted"></p>
+          </div>
+          <div id="adminRequestCardList" class="grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
+        </div>
+      </section>
+
+      <div id="requestTableCard" class="stat-card mb-6">
         <p class="text-sm text-cbsua-muted mb-4">Request register — One item per request</p>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">

@@ -360,12 +360,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     dialog.classList.add('grid');
     dialog.querySelector('.ims-settings-close').focus();
   }
-  function showConfirmation(title, description, confirmLabel, onConfirm, danger = false) {
+  function showConfirmation(title, description, confirmLabel, onConfirm, danger = false, request = null) {
     dialogOpener = document.activeElement;
     dialogTitle.textContent = title;
     dialogDescription.textContent = description;
-    const prompt = createElement('div', 'mx-auto grid h-12 w-12 place-items-center rounded-full bg-cbsua-light text-xl font-bold text-cbsua-primary', danger ? '!' : '?');
-    dialogContent.replaceChildren(prompt);
+    if (request) {
+      const details = createElement('dl', 'grid grid-cols-1 gap-3 rounded-xl border border-cbsua-border bg-gray-50 p-4 sm:grid-cols-2');
+      [
+        ['Request / Date', request.id, request.date],
+        ['Office / Recipient', request.office, [
+          request.recipient,
+          request.employeeId ? `ID ${request.employeeId}` : ''
+        ].filter(Boolean).join(' · ')],
+        ['Item / Quantity', request.item, request.quantity]
+      ].forEach(([label, value, supportingText]) => {
+        const group = createElement('div', 'min-w-0');
+        group.append(
+          createElement('dt', 'text-xs font-medium uppercase tracking-wide text-cbsua-muted', label),
+          createElement('dd', 'mt-1 break-words font-medium text-gray-900 dark:text-gray-100', value || '—')
+        );
+        if (supportingText) {
+          group.append(createElement('dd', 'mt-1 break-words text-sm text-cbsua-muted', supportingText));
+        }
+        details.append(group);
+      });
+      dialogContent.replaceChildren(details);
+    } else {
+      const prompt = createElement('div', 'mx-auto grid h-12 w-12 place-items-center rounded-full bg-cbsua-light text-xl font-bold text-cbsua-primary', danger ? '!' : '?');
+      dialogContent.replaceChildren(prompt);
+    }
     dialogActions.replaceChildren();
     const cancelButton = createElement('button', 'rounded-lg border border-gray-300 px-4 py-2 dark:border-gray-600', 'Cancel');
     cancelButton.type = 'button';
@@ -522,9 +545,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (target.matches('[data-request-action]')) {
         if (currentUser.role !== 'admin') return showToast('Only the Supply Office head can review requests.');
         const row = target.closest('tr');
-        const requestId = row?.dataset.requestId;
+        const requestCard = target.closest('[data-request-card]');
+        const requestId = row?.dataset.requestId || requestCard?.dataset.requestId;
+        const request = getLocalRecords('requests').find(entry => entry.id === requestId);
+        if (!request) return showToast('The stock request could not be found.');
         const status = target.dataset.requestAction === 'approve' ? 'Approved' : 'Rejected';
-        if (!requestId) return;
         return showConfirmation(
           `${status} stock request`,
           `Are you sure you want to ${status.toLowerCase()} ${requestId}?`,
@@ -537,7 +562,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (countBadge) countBadge.textContent = String(pendingCount);
             showToast(`${requestId} ${status.toLowerCase()}.`);
           },
-          status === 'Rejected'
+          status === 'Rejected',
+          request
         );
       }
       if (target.matches('[data-item-action]')) {
@@ -627,7 +653,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (label.includes('Review')) {
           if (currentUser.role !== 'admin') return showToast('Only the Supply Office head can review requests.');
           const row = target.closest('tr'), requestId = row?.cells[0]?.innerText.trim().split('\n')[0];
-          if (row) showConfirmation(
+          const request = getLocalRecords('requests').find(entry => entry.id === requestId);
+          if (row && request) showConfirmation(
             'Approve stock request',
             `Are you sure you want to approve ${requestId}?`,
             'Approve',
@@ -636,7 +663,9 @@ document.addEventListener('DOMContentLoaded', async () => {
               const request = getLocalRecords('requests').find(entry => entry.id === requestId);
               if (request) addRequestRow(request);
               showToast(`${requestId} approved.`);
-            }
+            },
+            false,
+            request
           );
         } else {
           showToast('the developer are authorized to change the password');
