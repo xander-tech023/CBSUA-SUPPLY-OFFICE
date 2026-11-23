@@ -2,6 +2,7 @@ window.IMS = window.IMS || {};
 
 (() => {
   const sessionKey = 'cbsuaSupplySession';
+  const registeredAccountsKey = 'cbsuaSupplyAccounts';
   const accounts = {
     admin: {
       id: 1,
@@ -29,9 +30,29 @@ window.IMS = window.IMS || {};
     }
   }
 
+  function readRegisteredAccounts() {
+    try {
+      return JSON.parse(localStorage.getItem(registeredAccountsKey) || '[]');
+    } catch {
+      return [];
+    }
+  }
+
+  function writeRegisteredAccount(account) {
+    const registeredAccounts = readRegisteredAccounts();
+    const duplicate = [...registeredAccounts, ...Object.values(accounts)].some(
+      existing => existing.username.toLowerCase() === account.username.toLowerCase()
+    );
+    if (duplicate) throw new Error('That username is already registered.');
+    registeredAccounts.push(account);
+    localStorage.setItem(registeredAccountsKey, JSON.stringify(registeredAccounts));
+  }
+
   window.IMS.accounts = {
     async login(role, username, password, remember) {
-      const account = accounts[role];
+      const account = [...Object.values(accounts), ...readRegisteredAccounts()].find(
+        candidate => candidate.username.toLowerCase() === username.toLowerCase()
+      );
       if (!account || account.username !== username || account.password !== password) {
         throw new Error('Username or password is incorrect for the selected workspace.');
       }
@@ -49,6 +70,19 @@ window.IMS = window.IMS || {};
         localStorage.removeItem(sessionKey);
       }
       return { ok: true, user };
+    },
+    async register(registration) {
+      const account = {
+        id: Date.now(),
+        username: registration.username.trim().toLowerCase(),
+        password: registration.password,
+        name: registration.fullName.trim(),
+        title: `${registration.office} account`,
+        office: registration.office,
+        role: registration.role
+      };
+      writeRegisteredAccount(account);
+      return { ok: true, account };
     },
     async getSession() {
       return readSession();

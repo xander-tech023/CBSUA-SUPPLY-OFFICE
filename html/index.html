@@ -45,28 +45,17 @@
     <div class="login-form-panel p-8 lg:w-2/3 flex flex-col justify-center">
       <div class="flex justify-end mb-8">
         <span class="bg-cbsua-light text-cbsua-primary text-sm px-4 py-1 rounded-full font-medium">
-          ADMIN & SUPPLY STAFF ACCESS
+          SUPPLY OFFICE ACCESS
         </span>
       </div>
 
       <div class="max-w-md w-full mx-auto">
-        <h2 class="text-2xl font-bold mb-2">Log In</h2>
-        <p class="text-cbsua-muted mb-6">Choose your workspace and sign in to the Supply Office Inventory Management System.</p>
+        <div id="loginHeading">
+          <h2 class="text-2xl font-bold mb-2">Log In</h2>
+          <p class="text-cbsua-muted mb-6">Sign in to the Supply Office Inventory Management System.</p>
+        </div>
 
         <form id="loginForm" class="login-form text-start">
-          <fieldset class="border-0 p-0">
-            <legend class="block font-medium mb-2">Workspace *</legend>
-            <div class="grid grid-cols-2 gap-3">
-              <label class="flex items-center gap-2 rounded-lg border border-cbsua-border p-3">
-                <input type="radio" name="role" value="admin" required />
-                <span><strong class="block">Admin</strong><span class="text-xs text-cbsua-muted">Head of Supply Office</span></span>
-              </label>
-              <label class="flex items-center gap-2 rounded-lg border border-cbsua-border p-3">
-                <input type="radio" name="role" value="staff" checked required />
-                <span><strong class="block">Staff</strong><span class="text-xs text-cbsua-muted">Supply Office team</span></span>
-              </label>
-            </div>
-          </fieldset>
           <div>
             <label class="block font-medium mb-2" for="username">Username *</label>
             <input 
@@ -111,14 +100,107 @@
             <p class="text-cbsua-muted text-xs">Use the credentials issued by your Supply Office administrator.</p>
           </div>
 
-          <a href="offices.html" class="block w-full border border-cbsua-border text-cbsua-primary py-3 rounded-lg font-medium text-center text-sm hover:bg-cbsua-light transition-colors mt-2">
-            View campus offices →
-          </a>
-
           <p class="text-cbsua-muted text-xs text-center mt-2">
              @2026 Garinga, Marcaida, San Juan. All rights reserved.
           </p>
         </form>
+
+        <form id="registrationForm" class="login-form text-start hidden" novalidate>
+          <div>
+            <h2 class="text-2xl font-bold mb-2">Create Account</h2>
+            <p class="text-cbsua-muted mb-1">Register an account for your campus office.</p>
+          </div>
+
+          <div>
+            <label class="block font-medium mb-2" for="fullName">Full name *</label>
+            <input type="text" id="fullName" name="fullName" autocomplete="name" minlength="3" maxlength="80" pattern="[A-Za-zÑñ ]+" class="w-full px-4 py-3 border border-cbsua-border rounded-lg focus:outline-none focus:ring-2 focus:ring-cbsua-primary/25" placeholder="Enter your full name" required />
+          </div>
+
+          <div>
+            <label class="block font-medium mb-2" for="registerUsername">Username *</label>
+            <input type="text" id="registerUsername" name="username" autocomplete="username" minlength="4" maxlength="30" pattern="[A-Za-z0-9._-]+" class="w-full px-4 py-3 border border-cbsua-border rounded-lg focus:outline-none focus:ring-2 focus:ring-cbsua-primary/25" placeholder="4–30 letters, numbers, dots or dashes" required />
+          </div>
+
+          <div>
+            <label class="block font-medium mb-2" for="registerOffice">Office *</label>
+            <select id="registerOffice" name="office" class="w-full px-4 py-3 border border-cbsua-border rounded-lg focus:outline-none focus:ring-2 focus:ring-cbsua-primary/25" required>
+              <option value="">Select your office</option>
+              <option>Accounting Office</option>
+              <option>Admission Office</option>
+              <option>Alumni Office</option>
+              <option>Auxiliary Budget Office</option>
+              <option>Bids and Awards Committee Office</option>
+              <option>Business Affairs Unit</option>
+              <option>Campus PIO</option>
+              <option>Cashier's Office</option>
+              <option>College of Engineering</option>
+              <option>College of Information Technology</option>
+              <option>Clinic / Infirmary</option>
+              <option>College of Criminology</option>
+              <option>College of Education</option>
+              <option>Commission on Audit</option>
+              <option>College of Industrial Technology</option>
+              <option>Curriculum and Instruction Division</option>
+              <option>Disaster Risk Readiness Management Office</option>
+              <option>Environmental Science and Agroforestry Program</option>
+              <option>Extension Services Unit</option>
+              <option>Gender and Development Office</option>
+              <option>General Administration and Support Services</option>
+              <option>Guidance and Counseling Unit</option>
+              <option>Human Resource Management Office</option>
+              <option>Informations and Communications Technology Office</option>
+              <option>Industry Linkages and Development Office</option>
+              <option>Institutional Planning and Development Office</option>
+              <option>Library</option>
+              <option>Motorpool</option>
+              <option>Office of Campus Administrator</option>
+              <option>Office of the Student Affairs and Services</option>
+              <option>Physical Plant and Development Office</option>
+              <option>Publication Office</option>
+              <option>Quality Assurance Office</option>
+              <option>Reading Center</option>
+              <option>Record's Office</option>
+              <option>Registrar's Office</option>
+              <option>Research and Development Center</option>
+              <option>ROTC / NSTP Office</option>
+              <option>Sentro ng Wika, Kultura at Sining</option>
+              <option>Supply Office</option>
+              <option>UMIS</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-medium mb-2" for="registerRole">Account type *</label>
+            <select id="registerRole" name="role" class="w-full px-4 py-3 border border-cbsua-border rounded-lg focus:outline-none focus:ring-2 focus:ring-cbsua-primary/25" required>
+              <option value="">Select account type</option>
+              <option value="staff">Staff</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-medium mb-2" for="registerPassword">Password *</label>
+            <input type="password" id="registerPassword" name="password" autocomplete="new-password" minlength="8" maxlength="64" pattern="(?=.*[A-Za-z])(?=.*\d).{8,64}" class="w-full px-4 py-3 border border-cbsua-border rounded-lg focus:outline-none focus:ring-2 focus:ring-cbsua-primary/25" placeholder="At least 8 characters with a letter and number" required />
+          </div>
+
+          <div>
+            <label class="block font-medium mb-2" for="confirmPassword">Confirm password *</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" autocomplete="new-password" minlength="8" maxlength="64" class="w-full px-4 py-3 border border-cbsua-border rounded-lg focus:outline-none focus:ring-2 focus:ring-cbsua-primary/25" placeholder="Re-enter your password" required />
+          </div>
+
+          <p class="hidden text-red-600 text-sm" id="registrationErr" role="alert"></p>
+          <button type="submit" class="w-full bg-cbsua-primary hover:bg-green-700 text-white py-3 rounded-lg font-medium transition-colors">
+            Create account
+          </button>
+          <button type="button" id="showLogin" class="w-full border border-cbsua-border text-cbsua-primary py-3 rounded-lg font-medium hover:bg-cbsua-light transition-colors">
+            Back to log in
+          </button>
+        </form>
+
+        <button type="button" id="showRegistration" class="w-full border border-cbsua-border text-cbsua-primary py-3 rounded-lg font-medium text-sm hover:bg-cbsua-light transition-colors mt-4">
+          Create an account
+        </button>
+        <p class="hidden text-green-700 text-sm mt-3 text-center" id="registrationSuccess" role="status"></p>
       </div>
     </div>
   </div>
