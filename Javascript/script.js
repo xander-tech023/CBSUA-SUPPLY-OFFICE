@@ -29,7 +29,7 @@ window.tailwind.config = {
   } }
 };
 document.addEventListener('DOMContentLoaded', async () => {
-  if (currentPage === 'index.html') return;
+  if (currentPage === 'index.html' || currentPage === 'navigation.html' || currentPage === 'offices.html') return;
 
   let currentUser;
   try {
@@ -238,6 +238,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const nav = sidebar.querySelector('nav') || createElement('nav');
     const currentPage = location.pathname.split('/').pop() || 'dashboard.html';
     nav.className = 'flex-1 min-h-0 overflow-hidden';
+    let officesLink = nav.querySelector('a[href="offices.html"]');
+    if (!officesLink) {
+      officesLink = createElement('a', 'sidebar-link');
+      officesLink.href = 'offices.html';
+      officesLink.append(
+        createIcon('M3.5 21V5.5l7-2.5V21m0-12h10v12M6.5 8.5h.01M6.5 12h.01M6.5 15.5h.01M14 12h2.5M14 15.5h2.5M14 19h2.5', 'h-4 w-4 fill-none stroke-current stroke-[1.8]')
+      );
+      officesLink.append(document.createTextNode(' Offices'));
+      nav.append(officesLink);
+    }
     nav.querySelectorAll('a[href]').forEach(link => {
       const href = link.getAttribute('href');
       const page = href?.split('#')[0];
