@@ -516,7 +516,7 @@ html.dark [class~="hover:bg-orange-100"]:hover {
   color: #fed7aa;
 }
 
-html.dark a:hover {
+html.dark a:not(.sidebar-link):hover {
   color: #bbf7d0;
 }
 
@@ -524,6 +524,15 @@ html.dark button:not(:disabled):hover,
 html.dark [role="button"]:hover {
   filter: brightness(1.2);
   box-shadow: 0 0 0 2px rgba(134, 239, 172, 0.45);
+}
+
+html.dark .sidebar-link:hover,
+html.dark .sidebar-link:focus-visible,
+html.dark .sidebar-link.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  filter: none;
+  box-shadow: none;
 }
 
 html.dark :is(a, button, input, select, textarea, [role="button"]):focus-visible {

@@ -1,6 +1,15 @@
 const currentPage = location.pathname.split('/').pop() || 'index.html';
 window.IMS = window.IMS || {};
 window.IMS.pageFeatures = window.IMS.pageFeatures || [];
+try {
+  const savedPreferences = JSON.parse(localStorage.getItem('cbsuaSupplyPreferences')) || {};
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDark = savedPreferences.theme === 'dark' ||
+    (savedPreferences.theme !== 'light' && systemDark);
+  document.documentElement.classList.toggle('dark', isDark);
+} catch {
+  // Let the regular preference initializer handle invalid or unavailable storage.
+}
 window.tailwind = window.tailwind || {};
 window.tailwind.config = {
   darkMode: 'class',
@@ -248,7 +257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     nav.replaceChildren(createElement('p', 'uppercase text-xs text-white/40 mb-2', 'Workspace'));
     pages.filter(([href]) => currentUser.role === 'admin' || href !== 'dashboard.html').forEach(([href, label, pathData]) => {
       const isCurrent = href.split('#')[0] === currentPage;
-      const link = createElement('a', `flex items-center gap-3 rounded-lg px-4 py-1.5 text-white/75 transition-colors hover:bg-white/10 hover:text-white${isCurrent ? ' bg-white/10 text-white' : ''}`);
+      const link = createElement('a', `sidebar-link${isCurrent ? ' active' : ''}`);
       link.href = href;
       if (isCurrent) link.setAttribute('aria-current', 'page');
       const icon = createElement('span');
@@ -265,10 +274,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     const footer = createElement('div', 'mt-auto shrink-0 border-t border-white/10 pt-3');
     footer.append(
-      createButton('Settings', 'flex w-full items-center gap-3 rounded-lg border-0 bg-transparent px-4 py-1.5 text-left font-[inherit] text-white/75 hover:bg-white/10 hover:text-white', 'openSettings', 'M12 3.5v2.2m0 14.6v2.2m8.5-8.5h-2.2M5.7 12H3.5m14.9-6.4-1.5 1.5M8.1 15.9l-1.5 1.5m0-11.8 1.5 1.5m7.8 7.8 1.5 1.5M12 8.5A3.5 3.5 0 1 1 12 15.5A3.5 3.5 0 0 1 12 8.5Z'),
-      createButton('Help?', 'flex w-full items-center gap-3 rounded-lg border-0 bg-transparent px-4 py-1.5 text-left font-[inherit] text-white/75 hover:bg-white/10 hover:text-white', 'openHelp', 'M9.75 9.25A2.5 2.5 0 0 1 12 7a2.5 2.5 0 0 1 2.5 2.5c0 1.7-1.5 2.2-2.1 3.1-.2.3-.4.6-.4 1.4M12 17.5h.01M12 3.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 0 0 0-17Z')
+      createButton('Settings', 'sidebar-link', 'openSettings', 'M12 3.5v2.2m0 14.6v2.2m8.5-8.5h-2.2M5.7 12H3.5m14.9-6.4-1.5 1.5M8.1 15.9l-1.5 1.5m0-11.8 1.5 1.5m7.8 7.8 1.5 1.5M12 8.5A3.5 3.5 0 1 1 12 15.5A3.5 3.5 0 0 1 12 8.5Z'),
+      createButton('Help?', 'sidebar-link', 'openHelp', 'M9.75 9.25A2.5 2.5 0 0 1 12 7a2.5 2.5 0 0 1 2.5 2.5c0 1.7-1.5 2.2-2.1 3.1-.2.3-.4.6-.4 1.4M12 17.5h.01M12 3.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 0 0 0-17Z')
     );
-    const signOut = createElement('a', 'flex items-center gap-3 rounded-lg px-4 py-1.5 text-white/75 hover:bg-white/10 hover:text-white');
+    const signOut = createElement('a', 'sidebar-link');
     signOut.href = 'index.html';
     signOut.dataset.signOut = '';
     signOut.append(createIcon('M15 7.5V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2.5M14 12h6m0 0-2.5-2.5M20 12l-2.5 2.5', 'h-4 w-4 fill-none stroke-current stroke-[1.8]'), document.createTextNode(' Sign out'));
@@ -488,6 +497,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('click', async event => {
       const target = event.target.closest('button, a');
       if (!target) return;
+      if (target.classList.contains('sidebar-link') && target.matches('a[href]')) {
+        setMenuOpen(false);
+      }
       if (target.matches('[data-open-settings]')) {
         dialogOpener = target;
         return openSettings();
