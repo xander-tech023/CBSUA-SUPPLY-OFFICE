@@ -112,6 +112,39 @@
   </div>
 
   <script>
+    const officesMenuButton = document.createElement("button");
+    officesMenuButton.type = "button";
+    officesMenuButton.className = "ims-menu-toggle fixed left-3 top-3 z-[80] grid h-11 w-11 place-items-center rounded-lg border border-gray-300 bg-white text-cbsua-dark shadow lg:hidden";
+    officesMenuButton.setAttribute("aria-label", "Open workspace menu");
+    officesMenuButton.setAttribute("aria-controls", "sidebar");
+    officesMenuButton.setAttribute("aria-expanded", "false");
+    officesMenuButton.innerHTML = '<svg viewBox="0 0 24 24" class="h-5 w-5 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>';
+    document.body.appendChild(officesMenuButton);
+
+    const officesMenuBackdrop = document.createElement("div");
+    officesMenuBackdrop.className = "ims-menu-backdrop fixed inset-0 z-30 hidden bg-slate-900/45 lg:hidden";
+    officesMenuBackdrop.setAttribute("aria-hidden", "true");
+    document.querySelector("main").before(officesMenuBackdrop);
+
+    function setOfficesMenuOpen(open) {
+      const sidebar = document.getElementById("sidebar");
+      sidebar.classList.toggle("-translate-x-full", !open);
+      officesMenuBackdrop.classList.toggle("hidden", !open);
+      officesMenuButton.setAttribute("aria-expanded", String(open));
+      officesMenuButton.setAttribute("aria-label", open ? "Close workspace menu" : "Open workspace menu");
+      officesMenuButton.innerHTML = open
+        ? '<svg viewBox="0 0 24 24" class="h-5 w-5 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>'
+        : '<svg viewBox="0 0 24 24" class="h-5 w-5 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>';
+    }
+
+    officesMenuButton.addEventListener("click", () => {
+      setOfficesMenuOpen(officesMenuButton.getAttribute("aria-expanded") !== "true");
+    });
+    officesMenuBackdrop.addEventListener("click", () => setOfficesMenuOpen(false));
+    document.querySelectorAll("#sidebar a[href]").forEach(link => {
+      link.addEventListener("click", () => setOfficesMenuOpen(false));
+    });
+
     const offices = [
       ["Accounting Office", "administrative"], ["Admission Office", "administrative"],
       ["Alumni Office", "administrative"], ["Auxiliary Budget Office", "administrative"],

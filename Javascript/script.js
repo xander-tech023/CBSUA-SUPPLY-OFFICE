@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     dialogDescription.textContent = 'CBSUA Supply Office Inventory Management System';
     dialogContent.replaceChildren();
     [
-      'Use the workspace menu to move between the Dashboard, Inventory, Stock Requests, Issue Supplies, Receive Stock, and Suppliers. Inventory items, requests, suppliers, and stock movements are saved locally in this browser.',
+      'Use the workspace menu to move between the Dashboard, Inventory, Stock Requests, Issue Supplies, Receive Stock, Suppliers, and Offices. Inventory items, requests, suppliers, offices, and stock movements are saved locally in this browser.',
       'For account access, password resets, or operational support, contact the Supply Office in person.'
     ].forEach(text => dialogContent.append(createElement('p', '', text)));
     dialogActions.replaceChildren();
