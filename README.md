@@ -4,11 +4,11 @@
 
 1. Copy the project folder into `C:\xampp\htdocs\CBSUA-SUPPLY-OFFICE`.
 2. Start **Apache** and **MySQL** from the XAMPP Control Panel.
-3. Open `http://localhost/CBSUA-SUPPLY-OFFICE/setup.php` once to create the MySQL database, tables, initial accounts, and starter inventory.
-4. Delete `setup.php` after setup succeeds.
+3. Use MySQL Workbench to connect to the XAMPP MySQL server and execute `database/schema.sql`. It creates the database, tables, initial accounts, suppliers, and starter inventory.
+4. Make sure `db_config.php` (or the matching `CBSUA_DB_*` environment variables) uses the same MySQL connection settings as Workbench.
 5. Open `http://localhost/CBSUA-SUPPLY-OFFICE/html/index.html`. Do not open the HTML files directly or use Live Server; PHP must run through Apache.
 
-The default database is `cbsua_supply_office` with XAMPP's `root` account and an empty password. Setup creates this database and its tables, including the extra receipt/request/issuance fields the app needs. Update the values in `db_config.php` or set the corresponding `CBSUA_DB_HOST`, `CBSUA_DB_PORT`, `CBSUA_DB_NAME`, `CBSUA_DB_USER`, and `CBSUA_DB_PASSWORD` environment variables if your MySQL configuration differs.
+The default database is `cbsua_supply_office` with XAMPP's `root` account and an empty password. Update the values in `db_config.php` or set the corresponding `CBSUA_DB_HOST`, `CBSUA_DB_PORT`, `CBSUA_DB_NAME`, `CBSUA_DB_USER`, and `CBSUA_DB_PASSWORD` environment variables if your MySQL configuration differs.
 
 | Workspace | Initial username | Initial password | Home |
 |---|---|---|---|
@@ -22,8 +22,3 @@ Appearance preferences are local to the browser. Delivery attachments are not up
 The Stock Requests page exports its currently filtered rows as CSV. Issue Supplies can print an approved requisition gate pass and export a recorded receipt through the browser's print dialog; choose **Save as PDF** to create a PDF. Dashboard metrics are loaded from MySQL, and status messages appear as floating notifications.
 
 React and ReactDOM are included from jsDelivr and power the toast notification component. Tailwind CSS and Chart.js are also loaded from their CDNs, so use a network connection when opening the pages.
-
-
-
-
-HAHAHAHA

@@ -9,8 +9,6 @@ CREATE DATABASE IF NOT EXISTS `cbsua_supply_office`
 
 USE `cbsua_supply_office`;
 
-SET FOREIGN_KEY_CHECKS = 0;
-
 CREATE TABLE IF NOT EXISTS `suppliers` (
   `id` VARCHAR(30) NOT NULL PRIMARY KEY,
   `name` VARCHAR(150) NOT NULL,
@@ -72,7 +70,7 @@ CREATE TABLE IF NOT EXISTS `stock_requests` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `stock_receipts` (
-  `id` VARCHAR(30) NOT NOT NULL PRIMARY KEY,
+  `id` VARCHAR(30) NOT NULL PRIMARY KEY,
   `item_id` VARCHAR(30) NOT NULL,
   `quantity` INT UNSIGNED NOT NULL,
   `supplier_id` VARCHAR(30) DEFAULT NULL,
@@ -128,17 +126,27 @@ CREATE TABLE IF NOT EXISTS `login_logs` (
   CONSTRAINT `fk_login_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-SET FOREIGN_KEY_CHECKS = 1;
-
--- Seed users. MySQL Workbench cannot generate PHP password_hash(), so the PHP
--- setup script also updates these accounts with valid application passwords.
+-- These hashes let the PHP login API verify the default accounts directly.
 INSERT INTO `users` (`username`, `password_hash`, `role`, `full_name`, `title`, `is_active`) VALUES
-('admin', '$2y$10$PLACEHOLDER_ADMIN_PASSWORD_HASH', 'admin', 'Jo-Ann Michelle Dio', 'OIC, Supply Officer', 1),
-('staff', '$2y$10$PLACEHOLDER_STAFF_PASSWORD_HASH', 'staff', 'Jezrel Oribiana', 'Supply Staff Officer', 1)
+('admin', '$2y$12$pkZwMVNl0SWdhbnvRexHk.JE71mOoeIwgLi9lDtkFss0Oiz.nxk4m', 'admin', 'Jo-Ann Michelle Dio', 'OIC, Supply Officer', 1),
+('staff', '$2y$12$OJFBTYodXwgbANiUeIvtMu23OITMNDg8lgWBt0hpz/.fbZMzzBoNq', 'staff', 'Jezrel Oribiana', 'Supply Staff Officer', 1)
 ON DUPLICATE KEY UPDATE
   `full_name` = VALUES(`full_name`),
   `title` = VALUES(`title`),
   `is_active` = 1;
+
+INSERT IGNORE INTO `suppliers` (`id`, `name`, `category`, `contact`, `phone`, `email`, `address`) VALUES
+('SUP-001', 'Bicol Office Depot', 'Office & school supplies, paper, stationery', 'Maria Cruz - Procurement', '0917-XXX-XXXX', 'bod@example.ph', 'National Highway, Sipocot, Camarines Sur'),
+('SUP-002', 'Sipocot Print Supply', 'Printers, toner, ink, printing services', 'Juan Reyes - Manager', '0918-XXX-XXXX', 'sps@example.ph', 'Barangay San Vicente, Sipocot, Camarines Sur'),
+('SUP-003', 'Camarines Essentials', 'Medical, hygiene, cleaning supplies', 'Ana Santos - Sales Officer', '0915-XXX-XXXX', 'ce@example.ph', 'Centro, Sipocot, Camarines Sur');
+
+INSERT IGNORE INTO `inventory_items` (`id`, `name`, `category`, `quantity`, `unit`, `minimum`, `supplier_id`) VALUES
+('ITM-001', 'Bond paper, A4', 'Paper supplies', 18, 'reams', 20, 'SUP-001'),
+('ITM-002', 'Bond paper, letter', 'Paper supplies', 240, 'reams', 50, 'SUP-001'),
+('ITM-003', 'Ballpen per pack', 'Writing tools', 24, 'pieces', 10, 'SUP-001'),
+('ITM-004', 'Toner cartridge', 'Printing', 12, 'cartridges', 5, 'SUP-002'),
+('ITM-005', 'Ethyl alcohol, 500 mL', 'Cleaning', 36, 'bottles', 10, 'SUP-003'),
+('ITM-008', 'Whiteboard marker', 'Writing tools', 0, 'pieces', 10, 'SUP-001');
 
 SELECT 'CBSUA Supply Office schema created successfully.' AS `status`;
 SELECT `id`, `username`, `role`, `full_name` FROM `users`;

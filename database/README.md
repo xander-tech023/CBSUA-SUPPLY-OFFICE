@@ -2,13 +2,11 @@
 
 ## Run in MySQL Workbench
 
-1. Open MySQL Workbench and connect to MySQL 8.0 or MariaDB/MySQL-compatible server used by XAMPP.
+1. Start MySQL in XAMPP and connect to that same server in MySQL Workbench.
 2. Open `database/schema.sql` using **File > Open SQL Script**.
 3. Confirm the connection is selected, then click the lightning-bolt **Execute** button.
-4. The script creates `cbsua_supply_office`, all application tables, foreign keys, and seed account rows.
-5. In XAMPP, open `http://localhost/CBSUA-SUPPLY-OFFICE/setup.php` once. It replaces placeholder password hashes with working PHP password hashes and adds starter inventory. Then delete `setup.php`.
-
-You can also import the script using **Server > Data Import** or copy/paste it into a Workbench SQL tab and execute it.
+4. The script creates `cbsua_supply_office`, all application tables, working login accounts, suppliers, and starter inventory. No PHP setup step is required.
+5. Make sure `db_config.php` (or its documented environment variables) uses the same host, port, database name, and MySQL credentials as the Workbench connection.
 
 ## Login accounts
 
@@ -17,4 +15,4 @@ You can also import the script using **Server > Data Import** or copy/paste it i
 | Admin | `admin` | `admin123` |
 | Staff | `staff` | `staff123` |
 
-Do not run the schema against a production database. It is intended for local XAMPP/MySQL Workbench setup.
+Run this script only against a local development database. It is intended for MySQL Workbench and XAMPP.
