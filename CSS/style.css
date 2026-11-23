@@ -282,11 +282,30 @@ textarea {
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  padding: 0.375rem 0.75rem;
   border-radius: 0.75rem;
   color: rgba(255, 255, 255, 0.8);
   text-decoration: none;
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+@media (min-width: 1024px) and (max-height: 640px) {
+  #sidebar {
+    padding: 0.75rem;
+  }
+
+  #sidebar > :first-child,
+  #sidebar > :first-child > :first-child {
+    margin-bottom: 0.5rem;
+  }
+
+  #sidebar nav > :first-child {
+    margin-bottom: 0.25rem;
+  }
+
+  #sidebar .sidebar-link {
+    padding-block: 0.125rem;
+  }
 }
 
 .sidebar-link:hover,

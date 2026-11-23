@@ -128,14 +128,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Shared IMS behavior
   (() => {
   const svgNamespace = 'http://www.w3.org/2000/svg';
-  const pages = [
-    ['dashboard.html', 'Dashboard', 'M4 18V9m6 9V5m6 13V12m4 6H4'],
-    ['inventory.html', 'Inventory', 'M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9Zm9 13.5v-9m9-4.5-9 4.5-9-4.5'],
-    ['stock_request.html', 'Stock Requests', 'M9 4.5h6M8 3.5h8a1 1 0 0 1 1 1v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-12a1 1 0 0 1 1-1h2Zm-1 7h8M7 11h8M7 15h6'],
-    ['issue_supply.html', 'Issue Supplies', 'M9 12.5l2 2 4-5m-7.5 9.5h9a2 2 0 0 0 2-2V7.5a2 2 0 0 0-2-2h-9a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2Z'],
-    ['receive_stock.html', 'Receive Stock', 'M12 4v8m0 0 3.5-3.5M12 12l-3.5-3.5M5 17.5h14'],
-    ['suppliers.html', 'Suppliers', 'M4 20V7.5L12 4l8 3.5V20M8 20v-6h8v6M10 10h.01M14 10h.01M10 13h.01M14 13h.01']
-  ];
   const preferenceKey = 'cbsuaSupplyPreferences', preferences = readPreferences();
   let toastTimer;
   let toastRoot;
@@ -162,14 +154,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     icon.append(path);
     return icon;
   }
-  function createButton(text, className, attribute, pathData) {
-    const button = createElement('button', className);
-    button.type = 'button';
-    button.dataset[attribute] = '';
-    button.append(createIcon(pathData, 'h-4 w-4'), document.createTextNode(` ${text}`));
-    return button;
-  }
-
   // Read preferences
   function readPreferences() {
     try {
@@ -251,41 +235,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   function buildSidebar() {
     const sidebar = document.querySelector('aside'), main = document.querySelector('main');
     if (!sidebar || !main) return;
-    const brand = sidebar.firstElementChild, nav = sidebar.querySelector('nav') || createElement('nav');
+    const nav = sidebar.querySelector('nav') || createElement('nav');
     const currentPage = location.pathname.split('/').pop() || 'dashboard.html';
     nav.className = 'flex-1 min-h-0 overflow-hidden';
-    nav.replaceChildren(createElement('p', 'uppercase text-xs text-white/40 mb-2', 'Workspace'));
-    pages.filter(([href]) => currentUser.role === 'admin' || href !== 'dashboard.html').forEach(([href, label, pathData]) => {
-      const isCurrent = href.split('#')[0] === currentPage;
-      const link = createElement('a', `sidebar-link${isCurrent ? ' active' : ''}`);
-      link.href = href;
+    nav.querySelectorAll('a[href]').forEach(link => {
+      const href = link.getAttribute('href');
+      const page = href?.split('#')[0];
+      const isCurrent = page === currentPage;
+      link.classList.toggle('active', isCurrent);
       if (isCurrent) link.setAttribute('aria-current', 'page');
-      const icon = createElement('span');
-      icon.setAttribute('aria-hidden', 'true');
-      icon.append(createIcon(pathData, 'h-4 w-4 fill-none stroke-current stroke-[1.8]'));
-      const linkLabel = createElement('span', '', label);
-      link.append(icon, linkLabel);
-      if (label === 'Stock Requests') {
-        const pending = getLocalRecords('requests').filter(request => request.status === 'Pending').length;
-        const count = createElement('span', 'ml-auto rounded-full bg-white/20 px-2 py-0.5 text-xs', String(pending));
-        link.append(count);
+      else link.removeAttribute('aria-current');
+      if (page === 'dashboard.html') link.hidden = currentUser.role !== 'admin';
+      if (page === 'stock_request.html') {
+        const count = link.querySelector('span');
+        if (count) count.textContent = String(getLocalRecords('requests').filter(request => request.status === 'Pending').length);
       }
-      nav.append(link);
     });
-    const footer = createElement('div', 'mt-auto shrink-0 border-t border-white/10 pt-3');
-    footer.append(
-      createButton('Settings', 'sidebar-link', 'openSettings', 'M12 3.5v2.2m0 14.6v2.2m8.5-8.5h-2.2M5.7 12H3.5m14.9-6.4-1.5 1.5M8.1 15.9l-1.5 1.5m0-11.8 1.5 1.5m7.8 7.8 1.5 1.5M12 8.5A3.5 3.5 0 1 1 12 15.5A3.5 3.5 0 0 1 12 8.5Z'),
-      createButton('Help?', 'sidebar-link', 'openHelp', 'M9.75 9.25A2.5 2.5 0 0 1 12 7a2.5 2.5 0 0 1 2.5 2.5c0 1.7-1.5 2.2-2.1 3.1-.2.3-.4.6-.4 1.4M12 17.5h.01M12 3.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 0 0 0-17Z')
-    );
-    const signOut = createElement('a', 'sidebar-link');
-    signOut.href = 'index.html';
-    signOut.dataset.signOut = '';
-    signOut.append(createIcon('M15 7.5V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2.5M14 12h6m0 0-2.5-2.5M20 12l-2.5 2.5', 'h-4 w-4 fill-none stroke-current stroke-[1.8]'), document.createTextNode(' Sign out'));
-    footer.append(signOut);
     sidebar.id = 'sidebar';
     sidebar.classList.add('fixed', 'left-0', 'top-0', 'z-40', 'h-screen', 'w-64', 'flex', 'flex-col', 'overflow-hidden', 'bg-cbsua-dark', 'p-4', 'text-white', 'transition-transform', '-translate-x-full', 'lg:translate-x-0');
     sidebar.setAttribute('aria-label', 'Workspace navigation');
-    sidebar.replaceChildren(brand, nav, footer);
     const header = main.querySelector('.mb-8');
     const profile = header?.querySelector('[class*="sm:block"]');
     if (profile) {
@@ -301,16 +269,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     main.classList.remove('ml-64', 'lg:ml-64');
     main.classList.add('min-w-0', 'ml-0', 'lg:ml-64', 'pt-16', 'lg:pt-6');
-    const compact = window.matchMedia('(min-width: 1024px) and (max-height: 640px)').matches;
-    sidebar.classList.toggle('p-3', compact);
-    sidebar.classList.toggle('p-4', !compact);
-    brand.classList.toggle('!mb-2', compact);
-    brand.firstElementChild?.classList.toggle('!mb-2', compact);
-    nav.firstElementChild?.classList.toggle('!mb-1', compact);
-    sidebar.querySelectorAll('nav a, nav button, .mt-auto a, .mt-auto button').forEach(link => {
-      link.classList.toggle('py-0.5', compact);
-      link.classList.toggle('py-1.5', !compact);
-    });
     const menuButton = createElement('button', 'ims-menu-toggle fixed left-3 top-3 z-[80] grid h-11 w-11 place-items-center rounded-lg border border-gray-300 bg-white text-xl text-cbsua-dark shadow lg:hidden dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100');
     menuButton.type = 'button';
     setAttributes(menuButton, { 'aria-label': 'Open workspace menu', 'aria-controls': 'sidebar', 'aria-expanded': 'false' });
@@ -711,13 +669,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     window.addEventListener('resize', () => {
       if (window.innerWidth >= 1024) setMenuOpen(false);
-      const sidebar = document.getElementById('sidebar'), compact = window.innerWidth >= 1024 && window.innerHeight <= 640;
-      sidebar?.classList.toggle('p-3', compact);
-      sidebar?.classList.toggle('p-4', !compact);
-      sidebar?.querySelectorAll('nav a, nav button, .mt-auto a, .mt-auto button').forEach(link => {
-        link.classList.toggle('py-0.5', compact);
-        link.classList.toggle('py-1.5', !compact);
-      });
     });
   }
   // Form handlers
