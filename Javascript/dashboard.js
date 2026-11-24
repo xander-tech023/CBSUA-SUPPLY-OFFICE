@@ -1,16 +1,88 @@
 document.addEventListener('DOMContentLoaded', () => {
   const { getLocalRecords } = window.IMS;
-  const canvas = document.getElementById('stockChart');
-  const chartDescription = canvas?.closest('.stat-card')?.querySelector('p.text-xs');
-  const stats = [...document.querySelectorAll('main .stat-card')].slice(0, 4);
-  const transactionBody = document.querySelector('#transactions tbody');
-  const attentionList = document.querySelector('main .grid.grid-cols-1.lg\\:grid-cols-3 > .stat-card:last-child .space-y-3');
   const notificationToggle = document.getElementById('notificationToggle');
   const notificationPanel = document.getElementById('notificationPanel');
   const notificationBadge = document.getElementById('notificationBadge');
   const notificationSummary = document.getElementById('notificationSummary');
   const notificationList = document.getElementById('notificationList');
+  const canvas = document.getElementById('stockChart');
+  const chartDescription = canvas?.closest('.stat-card')?.querySelector('p.text-xs');
+  const stats = [...document.querySelectorAll('main .stat-card')].slice(0, 4);
+  const transactionBody = document.querySelector('#transactions tbody');
+  const attentionList = document.querySelector('main .grid.grid-cols-1.lg\\:grid-cols-3 > .stat-card:last-child .space-y-3');
   let chart = null;
+
+  function renderPasswordResetNotifications() {
+    if (!notificationList || !notificationBadge || !notificationSummary) return;
+    const requests = window.IMS.accounts.readPasswordResetRequests()
+      .filter(request => request.status === 'Pending');
+    notificationList.replaceChildren();
+    notificationBadge.textContent = String(requests.length);
+    notificationBadge.classList.toggle('hidden', requests.length === 0);
+    notificationSummary.textContent = requests.length
+      ? `${requests.length} password reset${requests.length === 1 ? '' : 's'}`
+      : 'No active alerts';
+
+    if (!requests.length) {
+      const empty = document.createElement('p');
+      empty.className = 'px-4 py-6 text-center text-sm text-cbsua-muted';
+      empty.textContent = 'No pending password reset requests.';
+      notificationList.append(empty);
+      return;
+    }
+
+    requests.forEach(request => {
+      const item = document.createElement('article');
+      item.className = 'border-b border-cbsua-border px-4 py-3 last:border-b-0';
+      const title = document.createElement('p');
+      title.className = 'font-medium';
+      title.textContent = 'Password reset request';
+      const account = document.createElement('p');
+      account.className = 'mt-1 text-sm';
+      account.textContent = `${request.accountName || request.username} (@${request.username})`;
+      const date = document.createElement('p');
+      date.className = 'mt-1 text-xs text-cbsua-muted';
+      date.textContent = new Date(request.requestedAt).toLocaleString();
+      const actions = document.createElement('div');
+      actions.className = 'mt-3 flex gap-2';
+      const rejectButton = document.createElement('button');
+      rejectButton.type = 'button';
+      rejectButton.className = 'rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50';
+      rejectButton.textContent = 'Reject';
+      rejectButton.addEventListener('click', () => {
+        window.IMS.accounts.rejectPasswordReset(request.id)
+          .then(() => window.IMS.showToast(`Password reset request for ${request.username} rejected.`))
+          .catch(error => window.IMS.showToast(error.message));
+      });
+      const approveButton = document.createElement('button');
+      approveButton.type = 'button';
+      approveButton.className = 'rounded-lg bg-cbsua-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700';
+      approveButton.textContent = 'Approve';
+      approveButton.addEventListener('click', () => {
+        window.IMS.accounts.approvePasswordReset(request.id)
+          .then(() => window.IMS.showToast(`Password reset request for ${request.username} approved.`))
+          .catch(error => window.IMS.showToast(error.message));
+      });
+      actions.append(rejectButton, approveButton);
+      item.append(title, account, date, actions);
+      notificationList.append(item);
+    });
+  }
+
+  notificationToggle?.addEventListener('click', () => {
+    const isOpen = !notificationPanel?.classList.contains('hidden');
+    notificationPanel?.classList.toggle('hidden', isOpen);
+    notificationToggle.setAttribute('aria-expanded', String(!isOpen));
+  });
+  document.addEventListener('click', event => {
+    if (!notificationPanel || notificationPanel.classList.contains('hidden')) return;
+    if (!event.target.closest('#notificationToggle') && !event.target.closest('#notificationPanel')) {
+      notificationPanel.classList.add('hidden');
+      notificationToggle?.setAttribute('aria-expanded', 'false');
+    }
+  });
+  window.addEventListener('ims:password-reset-updated', renderPasswordResetNotifications);
+  renderPasswordResetNotifications();
 
   function makeCell(text) {
     const cell = document.createElement('td');
@@ -18,109 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
     cell.textContent = text;
     return cell;
   }
-
-  function renderNotifications(requests, items) {
-    if (!notificationList) return;
-    const notifications = requests
-      .filter(request => request.status === 'Pending')
-      .map(request => ({
-        title: `Approval needed · ${request.id}`,
-        details: `${request.office || 'Office'} · ${request.recipient || 'End user'} requested ${request.quantity} of ${request.item}.`,
-        note: request.remarks ? `End-user note: ${request.remarks}` : '',
-        href: 'stock_request.html'
-      }));
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    items.forEach(item => {
-      const quantity = Number(item.quantity);
-      const minimum = Number(item.minimum);
-      if (Number.isFinite(quantity) && Number.isFinite(minimum) && quantity <= minimum) {
-        notifications.push({
-          title: quantity <= 0 ? `Out of stock · ${item.name}` : `Low stock · ${item.name}`,
-          details: `${quantity} ${item.unit} available; minimum is ${minimum} ${item.unit}.`,
-          note: '',
-          href: 'inventory.html'
-        });
-      }
-
-      const expiryDate = item.expiry ? new Date(`${item.expiry}T00:00:00`) : null;
-      const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate - today) / 86400000) : null;
-      const isExpiring = expiryDate
-        ? daysUntilExpiry >= 0 && daysUntilExpiry <= 45
-        : item.status?.toLowerCase().includes('expiring');
-      if (isExpiring) {
-        notifications.push({
-          title: `Expiring item · ${item.name}`,
-          details: item.expiry ? `Expires ${item.expiry}.` : item.status,
-          note: '',
-          href: 'inventory.html'
-        });
-      }
-    });
-
-    notificationList.replaceChildren();
-    if (!notifications.length) {
-      const emptyState = document.createElement('p');
-      emptyState.className = 'px-4 py-6 text-center text-sm text-cbsua-muted';
-      emptyState.textContent = 'You are all caught up.';
-      notificationList.append(emptyState);
-    } else {
-      notifications.forEach(notification => {
-        const link = document.createElement('a');
-        link.href = notification.href;
-        link.className = 'block border-b border-cbsua-border px-4 py-3 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700';
-        const title = document.createElement('p');
-        title.className = 'text-sm font-medium';
-        title.textContent = notification.title;
-        const details = document.createElement('p');
-        details.className = 'mt-1 text-xs text-cbsua-muted';
-        details.textContent = notification.details;
-        link.append(title, details);
-        if (notification.note) {
-          const note = document.createElement('p');
-          note.className = 'mt-1 text-xs text-cbsua-muted';
-          note.textContent = notification.note;
-          link.append(note);
-        }
-        notificationList.append(link);
-      });
-    }
-
-    const count = notifications.length;
-    if (notificationBadge) {
-      notificationBadge.textContent = count > 99 ? '99+' : String(count);
-      notificationBadge.classList.toggle('hidden', count === 0);
-    }
-    if (notificationSummary) {
-      notificationSummary.textContent = `${count} active ${count === 1 ? 'notification' : 'notifications'}`;
-    }
-    notificationToggle?.setAttribute('aria-label', `Notifications, ${count} active ${count === 1 ? 'notification' : 'notifications'}`);
-  }
-
-  function setNotificationOpen(isOpen) {
-    if (!notificationToggle || !notificationPanel) return;
-    notificationPanel.classList.toggle('hidden', !isOpen);
-    notificationToggle.setAttribute('aria-expanded', String(isOpen));
-  }
-
-  notificationToggle?.addEventListener('click', () => {
-    setNotificationOpen(notificationPanel?.classList.contains('hidden'));
-  });
-  document.addEventListener('click', event => {
-    if (!notificationPanel?.contains(event.target) && !notificationToggle?.contains(event.target)) {
-      setNotificationOpen(false);
-    }
-  });
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') setNotificationOpen(false);
-  });
-  window.addEventListener('storage', event => {
-    if (event.key !== 'cbsuaSupplyRecords') return;
-    window.IMS.initializeRecords()
-      .then(() => window.dispatchEvent(new CustomEvent('ims:records-updated')))
-      .catch(error => console.error('Dashboard notifications could not be refreshed.', error));
-  });
 
   function getMovementData() {
     const receipts = getLocalRecords('receipts');
@@ -164,7 +133,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const items = getLocalRecords('items');
     const requests = getLocalRecords('requests');
     const pending = requests.filter(request => request.status === 'Pending').length;
-    renderNotifications(requests, items);
     const lowStock = items.filter(item => item.quantity <= item.minimum).length;
     const expiring = items.filter(item => {
       if (!item.expiry) return item.status?.toLowerCase().includes('expiring');
