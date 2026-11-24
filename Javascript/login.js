@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setChangePasswordMode(enabled, username) {
+    if (enabled) registrationSuccess.classList.add('hidden');
     loginForm?.classList.toggle('hidden', enabled);
     registrationForm?.classList.toggle('hidden', true);
     resetPasswordRequestForm?.classList.toggle('hidden', true);
@@ -45,13 +46,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderResetStatus() {
     const username = localStorage.getItem(lastResetUsernameKey);
-    registrationSuccess.classList.add('hidden');
     if (!username) {
       showResetPassword.textContent = 'Reset password';
       return;
     }
     const latestRequest = window.IMS.accounts.readPasswordResetRequests()
-      .filter(request => request.username === username)
+      .filter(request => request.username === username && ['staff', 'end-user'].includes(request.role))
       .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt))[0];
     if (!latestRequest) {
       showResetPassword.textContent = 'Reset password';
@@ -66,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setResetPasswordMode(requesting) {
+    if (requesting) registrationSuccess.classList.add('hidden');
     loginForm?.classList.toggle('hidden', requesting);
     registrationForm?.classList.toggle('hidden', true);
     resetPasswordRequestForm?.classList.toggle('hidden', !requesting);
@@ -77,7 +78,9 @@ document.addEventListener('DOMContentLoaded', () => {
   showResetPassword?.addEventListener('click', () => {
     const username = localStorage.getItem(lastResetUsernameKey);
     const approved = username && window.IMS.accounts.readPasswordResetRequests().some(request =>
-      request.username === username && request.status === 'Approved'
+      request.username === username
+      && ['staff', 'end-user'].includes(request.role)
+      && request.status === 'Approved'
     );
     if (approved) setChangePasswordMode(true, username);
     else setResetPasswordMode(true);
@@ -184,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
       firstName: document.getElementById('firstName').value.trim(),
       middleName: document.getElementById('middleName').value.trim(),
       surname: document.getElementById('surname').value.trim(),
+      employeeId: document.getElementById('registerEmployeeId').value.trim(),
       username: document.getElementById('registerUsername').value.trim(),
       office: document.getElementById('registerOffice').value,
       position: document.getElementById('registerPosition').value.trim(),

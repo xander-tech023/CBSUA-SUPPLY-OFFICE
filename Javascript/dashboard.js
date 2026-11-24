@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderPasswordResetNotifications() {
     if (!notificationList || !notificationBadge || !notificationSummary) return;
     const requests = window.IMS.accounts.readPasswordResetRequests()
-      .filter(request => request.status === 'Pending');
+      .filter(request => request.status === 'Pending' && ['staff', 'end-user'].includes(request.role));
     notificationList.replaceChildren();
     notificationBadge.textContent = String(requests.length);
     notificationBadge.classList.toggle('hidden', requests.length === 0);

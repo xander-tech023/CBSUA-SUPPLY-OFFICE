@@ -90,8 +90,72 @@ window.IMS = window.IMS || {};
     const overrides = readPasswordOverrides();
     return [...Object.values(accounts).map(account => ({
       ...account,
-      password: overrides[account.username.toLowerCase()] || account.password
+      password: account.role === 'admin'
+        ? account.password
+        : overrides[account.username.toLowerCase()] || account.password
     })), ...readRegisteredAccounts()];
+  }
+
+  function canResetPassword(account) {
+    return account?.role === 'staff' || account?.role === 'end-user';
+  }
+
+  function validatePassword(password) {
+    return typeof password === 'string'
+      && password.length >= 8
+      && password.length <= 64
+      && /[A-Za-z]/.test(password)
+      && /\d/.test(password);
+  }
+
+  function normalizeRegistration(registration) {
+    if (!registration || typeof registration !== 'object') {
+      throw new Error('Enter the account details before creating the account.');
+    }
+    const firstName = String(registration.firstName || '').trim();
+    const middleName = String(registration.middleName || '').trim();
+    const surname = String(registration.surname || '').trim();
+    const employeeId = String(registration.employeeId || '').trim();
+    const username = String(registration.username || '').trim().toLowerCase();
+    const position = String(registration.position || '').trim();
+    const office = String(registration.office || '').trim();
+    const email = String(registration.email || '').trim().toLowerCase();
+    const password = registration.password;
+
+    if (!firstName || !surname || !employeeId || !position || !office || !email || !username) {
+      throw new Error('Complete all required account details.');
+    }
+    if (!/^[A-Za-z0-9._-]{4,30}$/.test(username)) {
+      throw new Error('Username must be 4-30 characters using letters, numbers, dots, underscores, or hyphens.');
+    }
+    if (!/^[A-Za-z0-9-]{2,24}$/.test(employeeId)) {
+      throw new Error('Enter a valid employee ID using letters, numbers, or hyphens.');
+    }
+    if (!/^[A-Za-zÑñ .'-]{2,40}$/.test(firstName)
+      || !/^[A-Za-zÑñ .'-]{2,40}$/.test(surname)
+      || (middleName && !/^[A-Za-zÑñ .'-]{1,40}$/.test(middleName))) {
+      throw new Error('Enter valid names using letters, spaces, apostrophes, periods, or hyphens.');
+    }
+    if (position.length < 2 || position.length > 80) {
+      throw new Error('Employee position must be 2-80 characters.');
+    }
+    if (!officeNames.includes(office)) throw new Error('Select a valid office.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a valid institutional email address.');
+    if (!validatePassword(password)) {
+      throw new Error('Password must be 8-64 characters and contain at least one letter and one number.');
+    }
+    return {
+      id: Date.now(),
+      username,
+      password,
+      name: [firstName, middleName, surname].filter(Boolean).join(' '),
+      employeeId,
+      title: position,
+      office,
+      officeId: getOfficeId(office),
+      email,
+      role: 'end-user'
+    };
   }
 
   function findAccount(username) {
@@ -132,20 +196,48 @@ window.IMS = window.IMS || {};
 
   function writeRegisteredAccount(account) {
     const registeredAccounts = readRegisteredAccounts();
-    const duplicate = [...registeredAccounts, ...Object.values(accounts)].some(
+    const existingAccounts = [...registeredAccounts, ...Object.values(accounts)];
+    const duplicate = existingAccounts.some(
       existing => existing.username.toLowerCase() === account.username.toLowerCase()
     );
     if (duplicate) throw new Error('That username is already registered.');
+    if (existingAccounts.some(existing =>
+      existing.employeeId
+      && existing.employeeId.toLowerCase() === account.employeeId.toLowerCase()
+    )) {
+      throw new Error('An account already exists for that employee ID.');
+    }
+    while (existingAccounts.some(existing => String(existing.id) === String(account.id))) {
+      account.id += 1;
+    }
     registeredAccounts.push(account);
+    localStorage.setItem(registeredAccountsKey, JSON.stringify(registeredAccounts));
+  }
+
+  function saveAccountPassword(account, password) {
+    const normalizedUsername = account.username.toLowerCase();
+    if (Object.values(accounts).some(item => item.username.toLowerCase() === normalizedUsername)) {
+      const overrides = readPasswordOverrides();
+      overrides[normalizedUsername] = password;
+      localStorage.setItem(passwordOverridesKey, JSON.stringify(overrides));
+      return;
+    }
+    const registeredAccounts = readRegisteredAccounts();
+    const registeredAccount = registeredAccounts.find(
+      item => item.username.toLowerCase() === normalizedUsername
+    );
+    if (!registeredAccount) throw new Error('No account was found with that username.');
+    registeredAccount.password = password;
     localStorage.setItem(registeredAccountsKey, JSON.stringify(registeredAccounts));
   }
 
   window.IMS.accounts = {
     async login(role, username, password, remember) {
+      const normalizedUsername = String(username || '').trim().toLowerCase();
       const account = getAllAccounts().find(
-        candidate => candidate.username.toLowerCase() === username.toLowerCase()
+        candidate => candidate.username.toLowerCase() === normalizedUsername
       );
-      if (!account || account.username.toLowerCase() !== username.toLowerCase() || account.password !== password) {
+      if (!account || account.password !== password) {
         throw new Error('Username or password is incorrect for the selected workspace.');
       }
       const user = {
@@ -171,23 +263,16 @@ window.IMS = window.IMS || {};
       if (!registration.acceptedTerms) {
         throw new Error('You must accept the Terms and Conditions to create an account.');
       }
-      const account = {
-        id: Date.now(),
-        username: registration.username.trim().toLowerCase(),
-        password: registration.password,
-        name: [registration.firstName, registration.middleName, registration.surname].filter(Boolean).join(' '),
-        title: registration.position.trim(),
-        office: registration.office,
-        officeId: getOfficeId(registration.office),
-        email: registration.email.trim().toLowerCase(),
-        role: 'end-user'
-      };
+      const account = normalizeRegistration(registration);
       writeRegisteredAccount(account);
       return { ok: true, account };
     },
     async requestPasswordReset(username) {
       const account = findAccount(username);
       if (!account) throw new Error('No account was found with that username.');
+      if (!canResetPassword(account)) {
+        throw new Error('Password resets are available only for staff and end-user accounts.');
+      }
       const normalizedUsername = account.username.toLowerCase();
       const requests = readPasswordResetRequests();
       if (requests.some(request => request.username === normalizedUsername
@@ -210,25 +295,19 @@ window.IMS = window.IMS || {};
     async resetPassword(username, password) {
       const account = findAccount(username);
       if (!account) throw new Error('No account was found with that username.');
+      if (!canResetPassword(account)) {
+        throw new Error('Only staff and end-user passwords can be reset.');
+      }
+      if (!validatePassword(password)) {
+        throw new Error('Password must be 8-64 characters and contain at least one letter and one number.');
+      }
       const normalizedUsername = account.username.toLowerCase();
       const requests = readPasswordResetRequests();
       const approvedRequest = requests.find(request =>
         request.username === normalizedUsername && request.status === 'Approved'
       );
       if (!approvedRequest) throw new Error('This password reset request has not been approved.');
-      if (Object.values(accounts).some(item => item.username.toLowerCase() === normalizedUsername)) {
-        const overrides = readPasswordOverrides();
-        overrides[normalizedUsername] = password;
-        localStorage.setItem(passwordOverridesKey, JSON.stringify(overrides));
-      } else {
-        const registeredAccounts = readRegisteredAccounts();
-        const registeredAccount = registeredAccounts.find(
-          item => item.username.toLowerCase() === normalizedUsername
-        );
-        if (!registeredAccount) throw new Error('No account was found with that username.');
-        registeredAccount.password = password;
-        localStorage.setItem(registeredAccountsKey, JSON.stringify(registeredAccounts));
-      }
+      saveAccountPassword(account, password);
       requests.forEach(request => {
         if (request.username === normalizedUsername && request.status === 'Approved') {
           request.status = 'Completed';
@@ -246,6 +325,9 @@ window.IMS = window.IMS || {};
       const requests = readPasswordResetRequests();
       const request = requests.find(entry => entry.id === requestId);
       if (!request || request.status !== 'Pending') throw new Error('This password reset request is no longer pending.');
+      if (!canResetPassword(findAccount(request.username))) {
+        throw new Error('Only staff and end-user passwords can be reset.');
+      }
       request.status = 'Approved';
       request.approvedAt = new Date().toISOString();
       writePasswordResetRequests(requests);
@@ -266,6 +348,7 @@ window.IMS = window.IMS || {};
       return { ok: true, request };
     },
     readPasswordResetRequests,
+    getOfficeId,
     async getSession() {
       const session = readSession();
       if (!session) return null;
