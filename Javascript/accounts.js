@@ -99,6 +99,37 @@ window.IMS = window.IMS || {};
     return getAllAccounts().find(account => account.username.toLowerCase() === normalized) || null;
   }
 
+  function getPublicProfile(account) {
+    if (!account) return null;
+    const { id, username, name, title, role, employeeId, office, email } = account;
+    return { id, username, name, title, role, employeeId: employeeId || '', office: office || '', email: email || '' };
+  }
+
+  function findAccountById(id) {
+    const account = getAllAccounts().find(candidate => String(candidate.id) === String(id));
+    return getPublicProfile(account);
+  }
+
+  function findEndUserByName(name, office) {
+    const normalizedName = String(name || '').trim().toLowerCase();
+    const normalizedOffice = String(office || '').trim().toLowerCase();
+    const account = getAllAccounts().find(candidate =>
+      candidate.role === 'end-user'
+      && candidate.name?.trim().toLowerCase() === normalizedName
+      && (!normalizedOffice || candidate.office?.trim().toLowerCase() === normalizedOffice)
+    );
+    return getPublicProfile(account);
+  }
+
+  function getSupplyOfficeHead() {
+    const account = getAllAccounts().find(candidate =>
+      candidate.role === 'admin'
+      && /\bhead\b/i.test(candidate.title || '')
+      && /supply office/i.test(`${candidate.title || ''} ${candidate.office || ''}`)
+    );
+    return getPublicProfile(account);
+  }
+
   function writeRegisteredAccount(account) {
     const registeredAccounts = readRegisteredAccounts();
     const duplicate = [...registeredAccounts, ...Object.values(accounts)].some(
@@ -235,8 +266,6 @@ window.IMS = window.IMS || {};
       return { ok: true, request };
     },
     readPasswordResetRequests,
-    getOfficeId,
-    getOfficeNames: () => [...officeNames],
     async getSession() {
       const session = readSession();
       if (!session) return null;
