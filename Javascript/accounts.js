@@ -96,7 +96,10 @@ window.IMS = window.IMS || {};
         username: account.username,
         name: account.name,
         title: account.title,
-        role: account.role
+        role: account.role,
+        employeeId: account.employeeId || '',
+        office: account.office || '',
+        email: account.email || ''
       };
       sessionStorage.setItem(sessionKey, JSON.stringify(user));
       if (remember) {
@@ -199,7 +202,19 @@ window.IMS = window.IMS || {};
     },
     readPasswordResetRequests,
     async getSession() {
-      return readSession();
+      const session = readSession();
+      if (!session) return null;
+      const account = [...Object.values(accounts), ...readRegisteredAccounts()].find(
+        candidate => candidate.username.toLowerCase() === session.username?.toLowerCase()
+      );
+      return account
+        ? {
+          ...session,
+          employeeId: account.employeeId || '',
+          office: account.office || '',
+          email: account.email || ''
+        }
+        : session;
     },
     async logout() {
       sessionStorage.removeItem(sessionKey);

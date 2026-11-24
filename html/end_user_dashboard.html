@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Dashboard — CBSUA Supply IMS</title>
+  <script src="../Javascript/records.js"></script>
+  <script src="../Javascript/accounts.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="../Javascript/react-loader.js"></script>
+  <script src="../Javascript/script.js"></script>
+  <link rel="stylesheet" href="../CSS/style.css" />
+  <script src="../Javascript/end-user-dashboard.js"></script>
+</head>
+<body class="font-sans bg-gray-50 min-h-screen">
+  <div class="flex">
+    <aside class="w-64 h-screen bg-cbsua-dark text-white p-4 fixed left-0 top-0 z-40 flex flex-col overflow-hidden transition-transform lg:translate-x-0 -translate-x-full" id="sidebar">
+      <div class="mb-3 shrink-0">
+        <div class="flex items-center gap-2 mb-4">
+          <img src="../Image/logo.png" alt="CBSUA" class="w-9 h-auto" />
+          <div>
+            <h6 class="font-semibold">CBSUA</h6>
+            <p class="text-white/50 text-xs">Sipocot Campus</p>
+          </div>
+        </div>
+        <p class="uppercase text-xs text-white/50 mb-2">End User Workspace</p>
+        <p class="text-white/70 text-sm mb-6">Supply requests and office stock</p>
+      </div>
+
+      <nav class="flex-1 min-h-0 overflow-hidden">
+        <p class="uppercase text-xs text-white/40 mb-2">Workspace</p>
+        <a href="end_user_dashboard.html" class="sidebar-link active" aria-current="page">
+          <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M4 18V9m6 9V5m6 13V12m4 6H4" stroke-linecap="round" stroke-linejoin="round"/></svg> My Dashboard
+        </a>
+        <a href="#availableItems" class="sidebar-link">
+          <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16M7 5h.01M7 12h.01M7 19h.01" stroke-linecap="round" stroke-linejoin="round"/></svg> Available Items
+        </a>
+        <a href="#myRequests" class="sidebar-link">
+          <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M8 5h11M8 12h11M8 19h11M4 5h.01M4 12h.01M4 19h.01" stroke-linecap="round" stroke-linejoin="round"/></svg> My Requests
+        </a>
+      </nav>
+
+      <div class="mt-auto shrink-0 pt-3 border-t border-white/10">
+        <button type="button" class="sidebar-link" data-open-settings>
+          <svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M12 3.5v2.2m0 14.6v2.2m8.5-8.5h-2.2M5.7 12H3.5m14.9-6.4-1.5 1.5M8.1 15.9l-1.5 1.5m0-11.8 1.5 1.5m7.8 7.8 1.5 1.5M12 8.5A3.5 3.5 0 1 1 12 15.5A3.5 3.5 0 0 1 12 8.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Settings
+        </button>
+        <button type="button" class="sidebar-link" data-open-help>
+          <svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M9.75 9.25A2.5 2.5 0 0 1 12 7a2.5 2.5 0 0 1 2.5 2.5c0 1.7-1.5 2.2-2.1 3.1-.2.3-.4.6-.4 1.4M12 17.5h.01M12 3.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 0 0 0-17Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Help?
+        </button>
+        <a href="index.html" class="sidebar-link" data-sign-out>
+          <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M15 7.5V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2.5M14 12h6m0 0-2.5-2.5M20 12l-2.5 2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Sign out
+        </a>
+      </div>
+    </aside>
+
+    <main class="flex-1 min-w-0 ml-0 lg:ml-64 p-6 pt-16 lg:pt-6">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
+        <div>
+          <h4 class="text-cbsua-muted text-sm">End User Workspace / Dashboard</h4>
+          <h2 class="text-2xl font-bold mt-1">My Supply Requests</h2>
+          <p class="text-cbsua-muted text-sm">Request available supplies and track requests for your office.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="relative">
+            <button type="button" class="relative p-2 border border-cbsua-border rounded-lg hover:bg-gray-50" id="userNotificationToggle" aria-label="Request notifications" aria-controls="userNotificationPanel" aria-expanded="false">
+              <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span id="userNotificationBadge" class="hidden absolute -right-1 -top-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-xs font-semibold flex items-center justify-center" aria-hidden="true">0</span>
+            </button>
+            <section id="userNotificationPanel" class="hidden absolute right-0 top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-cbsua-border bg-white shadow-xl" aria-labelledby="userNotificationHeading">
+              <div class="flex items-center justify-between border-b border-cbsua-border px-4 py-3">
+                <div>
+                  <h3 id="userNotificationHeading" class="font-semibold">Request updates</h3>
+                  <span id="userNotificationSummary" class="text-xs text-cbsua-muted">No new updates</span>
+                </div>
+                <button type="button" id="markNotificationsRead" class="text-xs font-medium text-cbsua-primary hover:underline" disabled>Mark all read</button>
+              </div>
+              <div id="userNotificationList" class="max-h-96 overflow-y-auto" aria-live="polite"></div>
+            </section>
+          </div>
+          <button type="button" class="p-2 border border-cbsua-border rounded-lg hover:bg-gray-50" id="themeToggle" aria-label="Change appearance">
+            <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M20 14.5A7.5 7.5 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-cbsua-primary text-white flex items-center justify-center text-sm font-semibold">EU</div>
+            <div class="hidden sm:block">
+              <p class="text-sm font-medium" id="userName">End User</p>
+              <p class="text-xs text-cbsua-muted" id="userOffice">Office</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section class="stat-card mb-6 border-l-4 border-cbsua-gold">
+        <p class="text-sm text-cbsua-muted">Signed in as</p>
+        <p class="mt-1 text-lg font-semibold" id="officeGreeting">Loading your office...</p>
+        <p class="mt-1 text-sm text-cbsua-muted">Your requests are sent to the Supply Office for review. Request remarks are shared with the administrator.</p>
+      </section>
+
+      <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6" aria-label="Request summary">
+        <article class="stat-card">
+          <p class="text-sm text-cbsua-muted">My requests</p>
+          <p class="mt-1 text-3xl font-bold" id="myRequestCount">0</p>
+        </article>
+        <article class="stat-card">
+          <p class="text-sm text-cbsua-muted">Pending review</p>
+          <p class="mt-1 text-3xl font-bold text-amber-600" id="pendingRequestCount">0</p>
+        </article>
+        <article class="stat-card">
+          <p class="text-sm text-cbsua-muted">Approved</p>
+          <p class="mt-1 text-3xl font-bold text-green-700" id="approvedRequestCount">0</p>
+        </article>
+        <article class="stat-card">
+          <p class="text-sm text-cbsua-muted">Issued</p>
+          <p class="mt-1 text-3xl font-bold text-blue-700" id="issuedRequestCount">0</p>
+        </article>
+      </section>
+
+      <section id="availableItems" class="stat-card mb-6">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 class="text-lg font-semibold">Available items</h3>
+            <p class="text-sm text-cbsua-muted">Choose an item currently in stock to start a request.</p>
+          </div>
+          <button type="button" data-open-modal class="rounded-lg bg-cbsua-primary px-4 py-2 text-sm font-medium text-white hover:bg-green-700">+ New stock request</button>
+        </div>
+        <div id="availableItemList" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-live="polite"></div>
+      </section>
+
+      <section id="myRequests" class="stat-card">
+        <div class="mb-4">
+          <h3 class="text-lg font-semibold">My request history</h3>
+          <p class="text-sm text-cbsua-muted">Review the status and remarks for your submitted requests.</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-cbsua-border text-left text-cbsua-muted">
+                <th class="pb-3 pr-4 font-medium">Request / Date</th>
+                <th class="pb-3 pr-4 font-medium">Item / Quantity</th>
+                <th class="pb-3 pr-4 font-medium">Status</th>
+                <th class="pb-3 font-medium">Purpose / Remarks</th>
+              </tr>
+            </thead>
+            <tbody id="myRequestList"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="requestModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 hidden">
+    <div class="m-4 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div class="mb-6 flex items-center justify-between">
+        <div>
+          <h3 class="text-xl font-bold">Create a stock request</h3>
+          <p class="mt-1 text-sm text-cbsua-muted">Your office details will be included with the request.</p>
+        </div>
+        <button type="button" data-close-modal class="text-cbsua-muted hover:text-black" aria-label="Close dialog">✕</button>
+      </div>
+      <form id="requestForm" class="space-y-5">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label class="mb-2 block font-medium" for="requestId">Request ID</label>
+            <input id="requestId" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" readonly />
+          </div>
+          <div>
+            <label class="mb-2 block font-medium" for="requestDate">Request date *</label>
+            <input id="requestDate" type="date" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" required />
+          </div>
+        </div>
+        <div>
+          <label class="mb-2 block font-medium" for="requestOffice">Requesting office</label>
+          <input id="requestOffice" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" readonly />
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label class="mb-2 block font-medium" for="requestRecipient">Requesting employee</label>
+            <input id="requestRecipient" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" readonly />
+          </div>
+          <div>
+            <label class="mb-2 block font-medium" for="requestEmployeeId">Employee ID</label>
+            <input id="requestEmployeeId" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" readonly />
+          </div>
+        </div>
+        <div>
+          <label class="mb-2 block font-medium" for="requestItem">Available item *</label>
+          <select id="requestItem" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" required></select>
+        </div>
+        <div>
+          <label class="mb-2 block font-medium" for="requestQuantity">Requested quantity *</label>
+          <input id="requestQuantity" type="number" min="1" step="1" value="1" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" required />
+        </div>
+        <div>
+          <label class="mb-2 block font-medium" for="requestRemarks">Purpose / Remarks</label>
+          <textarea id="requestRemarks" rows="3" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" placeholder="Explain what the supplies are needed for or add a note for the administrator."></textarea>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" data-close-modal class="rounded-lg border border-cbsua-border px-4 py-2 font-medium hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="rounded-lg bg-cbsua-primary px-4 py-2 font-medium text-white hover:bg-green-700">Submit request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

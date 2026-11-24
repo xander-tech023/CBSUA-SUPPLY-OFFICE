@@ -112,8 +112,13 @@
           </div>
 
           <div>
-            <label class="block font-medium mb-2" for="registerUsername">Username *</label>
-            <input type="text" id="registerUsername" name="username" autocomplete="username" minlength="4" maxlength="30" pattern="[A-Za-z0-9._-]+" class="w-full px-4 py-3 border border-cbsua-border rounded-lg focus:outline-none focus:ring-2 focus:ring-cbsua-primary/25" placeholder="4–30 letters, numbers, dots or dashes" required />
+            <label class="block font-medium mb-2" for="registerEmployeeId">Employee ID *</label>
+            <input type="text" id="registerEmployeeId" name="employeeId" autocomplete="off" maxlength="24" class="w-full px-4 py-3 border border-cbsua-border rounded-lg focus:outline-none focus:ring-2 focus:ring-cbsua-primary/25" placeholder="Employee ID" required />
+          </div>
+
+          <div>
+            <label class="block font-medium mb-2" for="registerPosition">Employee Position *</label>
+            <input type="text" id="registerPosition" name="position" autocomplete="organization-title" minlength="2" maxlength="80" class="w-full px-4 py-3 border border-cbsua-border rounded-lg focus:outline-none focus:ring-2 focus:ring-cbsua-primary/25" placeholder="Your position in the office" required />
           </div>
 
           <div>

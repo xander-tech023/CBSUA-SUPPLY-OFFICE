@@ -204,7 +204,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const password = passInput.value;
     errorMessage.classList.add('hidden');
     window.IMS.accounts.login(null, username, password, document.getElementById('rememberMe').checked)
-      .then(result => { window.location.href = result.user.role === 'admin' ? 'dashboard.html' : 'inventory.html'; })
+      .then(result => {
+        const home = result.user.role === 'admin'
+          ? 'dashboard.html'
+          : result.user.role === 'end-user'
+            ? 'end_user_dashboard.html'
+            : 'inventory.html';
+        window.location.href = home;
+      })
       .catch(error => {
         console.error('Login request failed.', error);
         errorMessage.textContent = error.message || 'Username or password is incorrect for the selected workspace.';
