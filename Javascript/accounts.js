@@ -24,6 +24,32 @@ window.IMS = window.IMS || {};
     }
   };
 
+  const officeNames = [
+    "Accounting Office", "Admission Office", "Alumni Office", "Auxiliary Budget Office",
+    "Bids and Awards Committee Office", "Business Affairs Unit", "Campus PIO",
+    "Cashier's Office", "Clinic / Infirmary", "College of Education",
+    "College of Engineering", "College of Industrial Technology",
+    "College of Information Technology", "College of Criminology",
+    "Commission on Audit", "Curriculum and Instruction Division",
+    "Disaster Risk Readiness Management Office",
+    "Environmental Science and Agroforestry Program", "Extension Services Unit",
+    "Gender and Development Office", "General Administration and Support Services",
+    "Guidance and Counseling Unit", "Human Resource Management Office",
+    "Informations and Communications Technology Office",
+    "Industry Linkages and Development Office",
+    "Institutional Planning and Development Office", "Library", "Motorpool",
+    "Office of Campus Administrator", "Office of the Student Affairs and Services",
+    "Physical Plant and Development Office", "Publication Office",
+    "Quality Assurance Office", "Reading Center", "Record's Office",
+    "Registrar's Office", "Research and Development Center", "ROTC / NSTP Office",
+    "Sentro ng Wika, Kultura at Sining", "Supply Office", "UMIS"
+  ].sort((a, b) => a.localeCompare(b));
+
+  function getOfficeId(officeName) {
+    const index = officeNames.findIndex(name => name.toLowerCase() === String(officeName || '').trim().toLowerCase());
+    return index >= 0 ? `OFF-${String(index + 1).padStart(3, '0')}` : '';
+  }
+
   function readSession() {
     try {
       return JSON.parse(sessionStorage.getItem(sessionKey) || localStorage.getItem(sessionKey) || 'null');
@@ -99,6 +125,7 @@ window.IMS = window.IMS || {};
         role: account.role,
         employeeId: account.employeeId || '',
         office: account.office || '',
+        officeId: account.officeId || getOfficeId(account.office),
         email: account.email || ''
       };
       sessionStorage.setItem(sessionKey, JSON.stringify(user));
@@ -120,6 +147,7 @@ window.IMS = window.IMS || {};
         name: [registration.firstName, registration.middleName, registration.surname].filter(Boolean).join(' '),
         title: registration.position.trim(),
         office: registration.office,
+        officeId: getOfficeId(registration.office),
         email: registration.email.trim().toLowerCase(),
         role: 'end-user'
       };
@@ -207,6 +235,8 @@ window.IMS = window.IMS || {};
       return { ok: true, request };
     },
     readPasswordResetRequests,
+    getOfficeId,
+    getOfficeNames: () => [...officeNames],
     async getSession() {
       const session = readSession();
       if (!session) return null;

@@ -312,7 +312,13 @@ window.IMS.pageFeatures.push(() => {
     const officeField = document.getElementById('requestOffice');
     const recipientField = document.getElementById('requestRecipient');
     const employeeIdField = document.getElementById('requestEmployeeId');
-    if (officeField) officeField.value = user.office || '';
+    if (officeField) {
+      officeField.value = user.office || '';
+      const officeId = user.officeId || window.IMS.accounts.getOfficeId(user.office);
+      officeField.title = officeId ? `${officeId} — ${user.office}` : user.office || '';
+      const officeIdField = document.getElementById('requestOfficeId');
+      if (officeIdField) officeIdField.textContent = officeId ? `Office ID: ${officeId}` : '';
+    }
     if (recipientField) recipientField.value = user.name || '';
     if (employeeIdField) employeeIdField.value = user.employeeId || '';
   }

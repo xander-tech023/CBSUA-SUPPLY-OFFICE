@@ -175,7 +175,12 @@
       ["Reading Center", "academic"], ["Record's Office", "administrative"], ["Registrar's Office", "administrative"],
       ["Research and Development Center", "academic"], ["ROTC / NSTP Office", "academic"],
       ["Sentro ng Wika, Kultura at Sining", "academic"], ["Supply Office", "administrative"], ["UMIS", "support"]
-    ];
+    ].sort((a, b) => a[0].localeCompare(b[0]))
+      .map((office, index) => [
+        office[0],
+        office[1],
+        `OFF-${String(index + 1).padStart(3, "0")}`
+      ]);
 
     const grid = document.getElementById("officeGrid");
     const search = document.getElementById("officeSearch");
@@ -294,7 +299,7 @@
         name.toLowerCase().includes(query)
       );
 
-      grid.innerHTML = visible.map(([name, type]) => {
+      grid.innerHTML = visible.map(([name, type, officeId]) => {
         const initials = name.split(/[\s/]+/).filter(Boolean).slice(0, 2).map(word => word[0]).join("").replace(/[^A-Z]/gi, "").toUpperCase();
         const label = type.charAt(0).toUpperCase() + type.slice(1);
         return `
@@ -305,6 +310,7 @@
                 <h3 class="font-semibold leading-snug">
                   <button type="button" class="office-details text-left hover:text-cbsua-primary" data-office="${name}" aria-label="View recent activity for ${name}">${name}</button>
                 </h3>
+                <p class="mt-1 text-xs font-medium text-cbsua-primary">${officeId}</p>
                 <span class="inline-block mt-2 text-xs px-2 py-1 rounded-full bg-gray-100 text-cbsua-muted">${label}</span>
               </div>
               <span class="text-xs text-cbsua-muted whitespace-nowrap">Active</span>

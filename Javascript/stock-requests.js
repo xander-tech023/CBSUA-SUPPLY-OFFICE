@@ -18,6 +18,17 @@ window.IMS.pageFeatures.push(() => {
   const isAdmin = window.IMS.currentUser?.role === 'admin';
   let statusFilter = '';
 
+  function formatOfficeOptions(select) {
+    if (!select) return;
+    [...select.options].forEach(option => {
+      if (!option.value || !window.IMS.accounts.getOfficeId(option.value)) return;
+      option.textContent = `${window.IMS.accounts.getOfficeId(option.value)} — ${option.value}`;
+    });
+  }
+
+  formatOfficeOptions(office);
+  formatOfficeOptions(document.querySelector('#requestOffice'));
+
   function refreshRequestForm() {
     if (itemSelect) {
       const previousValue = itemSelect.value;

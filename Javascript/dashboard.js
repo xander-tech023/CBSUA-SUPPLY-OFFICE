@@ -174,8 +174,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (attentionList) {
       attentionList.replaceChildren();
-      const attentionItems = items.filter(item => item.quantity <= item.minimum || item.status?.toLowerCase().includes('expiring'));
-      attentionItems.slice(0, 5).forEach(item => {
+      const lowStockItems = items
+        .filter(item => item.quantity <= item.minimum)
+        .sort((a, b) => {
+          const quantityDifference = Number(b.quantity) - Number(a.quantity);
+          return quantityDifference || a.name.localeCompare(b.name);
+        });
+      lowStockItems.slice(0, 5).forEach(item => {
         const card = document.createElement('div');
         const out = item.quantity <= 0;
         card.className = `${out ? 'bg-red-50 border-red-400' : 'bg-amber-50 border-amber-400'} border-l-4 p-3 rounded-r-lg`;
@@ -188,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
         card.append(name, status);
         attentionList.append(card);
       });
-      if (!attentionItems.length) {
+      if (!lowStockItems.length) {
         const message = document.createElement('p');
         message.className = 'text-sm text-cbsua-muted';
         message.textContent = 'No stock alerts. Inventory is in good standing.';
