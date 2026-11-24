@@ -48,7 +48,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.body.replaceChildren(message);
     return;
   }
-  const roleHome = currentUser?.role === 'admin' ? 'dashboard.html' : 'inventory.html';
+  const roleHome = currentUser?.role === 'admin'
+    ? 'dashboard.html'
+    : currentUser?.role === 'end-user'
+      ? 'end_user_dashboard.html'
+      : 'inventory.html';
+  if (currentUser.role === 'end-user' && currentPage !== 'end_user_dashboard.html') {
+    window.location.replace(roleHome);
+    return;
+  }
+  if (currentPage === 'end_user_dashboard.html' && currentUser.role !== 'end-user') {
+    window.location.replace(roleHome);
+    return;
+  }
   if (currentPage === 'dashboard.html' && currentUser.role !== 'admin') {
     window.location.replace(roleHome);
     return;
@@ -62,6 +74,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const modalId = {
     'inventory.html': 'addItemModal',
     'stock_request.html': 'requestModal',
+    'end_user_dashboard.html': 'requestModal',
     'suppliers.html': 'supplierModal'
   }[currentPage];
   const pageModal = modalId ? document.getElementById(modalId) : null;
@@ -244,7 +257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const currentPage = location.pathname.split('/').pop() || 'dashboard.html';
     nav.className = 'flex-1 min-h-0 overflow-hidden';
     let officesLink = nav.querySelector('a[href="offices.html"]');
-    if (!officesLink) {
+    if (!officesLink && currentUser.role !== 'end-user') {
       officesLink = createElement('a', 'sidebar-link');
       officesLink.href = 'offices.html';
       officesLink.append(
@@ -739,6 +752,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           office: form.querySelector('#requestOffice').value,
           recipient: form.querySelector('#requestRecipient').value.trim(),
           employeeId: form.querySelector('#requestEmployeeId').value.trim().toUpperCase(),
+          requesterId: currentUser.id,
           item: item.name,
           itemId,
           quantity: `${quantity} ${item.unit}`,
@@ -747,6 +761,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
         if (!/^[A-Z0-9-]{3,24}$/.test(request.employeeId)) {
           return showToast('Enter an employee ID using 3–24 letters, numbers, or hyphens.');
+        }
+        if (currentUser.role === 'end-user' && quantity > item.quantity) {
+          return showToast(`Only ${item.quantity} ${item.unit} are currently available.`);
         }
         if (getLocalRecords('requests').some(savedRequest => savedRequest.id === request.id)) {
           return showToast(`${request.id} already exists.`);

@@ -111,7 +111,7 @@
 
           <div>
             <label class="block font-medium mb-2" for="registerEmployeeId">Employee ID *</label>
-            <input type="text" id="registerEmployeeId" name="employeeId" autocomplete="off" maxlength="24" class="w-full px-4 py-3 border border-cbsua-border rounded-lg focus:outline-none focus:ring-2 focus:ring-cbsua-primary/25" placeholder="Employee ID" required />
+            <input type="text" id="registerEmployeeId" name="employeeId" autocomplete="off" minlength="3" maxlength="24" pattern="[A-Za-z0-9-]{3,24}" title="Use 3–24 letters, numbers, or hyphens." class="w-full px-4 py-3 border border-cbsua-border rounded-lg focus:outline-none focus:ring-2 focus:ring-cbsua-primary/25" placeholder="Employee ID" required />
           </div>
 
           <div>
