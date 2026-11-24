@@ -349,6 +349,9 @@ window.IMS = window.IMS || {};
     },
     readPasswordResetRequests,
     getOfficeId,
+    findAccountById,
+    findEndUserByName,
+    getSupplyOfficeHead,
     async getSession() {
       const session = readSession();
       if (!session) return null;

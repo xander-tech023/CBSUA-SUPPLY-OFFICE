@@ -154,7 +154,181 @@ window.IMS.pageFeatures.push(() => {
     return element;
   }
 
-  function printSupplyDocument(type) {
+  function formatDocumentDate(value) {
+    if (!value) return '—';
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T00:00:00`)
+      : new Date(value);
+    return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    }).format(date);
+  }
+
+  async function printRequisitionIssueSlip({
+    request, item, quantity, requestedQuantity, issueDate, reference,
+    requestedBy, approvedBy, supplyOfficeHead, remarks
+  }) {
+    const printWindow = window.open('about:blank', '_blank');
+    if (!printWindow) {
+      showToast('Allow pop-ups to open and print the Requisition and Issue Slip.');
+      return;
+    }
+
+    printWindow.document.title = `CBSUA-Requisition-and-Issue-Slip-${reference}`;
+    printWindow.document.body.textContent = 'Preparing the Requisition and Issue Slip...';
+    let pdfUrl;
+    try {
+      if (window.location.protocol === 'file:') {
+        throw new Error('Open this app through XAMPP/localhost so the supplied PDF can be read.');
+      }
+      if (!window.PDFLib) {
+        throw new Error('The PDF form library did not load. Run npm install and reload this page.');
+      }
+
+      const templateUrl = new URL('../Requisition_and_Issue_Slip.pdf', window.location.href);
+      const response = await fetch(templateUrl);
+      if (!response.ok) {
+        throw new Error(`Could not load the supplied RIS form (HTTP ${response.status}).`);
+      }
+
+      const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
+      const pdfDocument = await PDFDocument.load(await response.arrayBuffer());
+      const page = pdfDocument.getPages()[0];
+      if (!page || pdfDocument.getPageCount() !== 1) {
+        throw new Error('The supplied RIS form must contain exactly one page.');
+      }
+
+      const font = await pdfDocument.embedFont(StandardFonts.TimesRoman);
+      const ink = rgb(0, 0, 0);
+      const fitText = (value, x, y, width, size, minSize = 5) => {
+        let text = String(value ?? '').replace(/[\r\n\t]+/g, ' ').trim();
+        if (!text) return;
+        let fontSize = size;
+        while (fontSize > minSize && font.widthOfTextAtSize(text, fontSize) > width) {
+          fontSize = Math.max(minSize, fontSize - 0.25);
+        }
+        if (font.widthOfTextAtSize(text, fontSize) > width) {
+          const suffix = '...';
+          while (text && font.widthOfTextAtSize(`${text}${suffix}`, fontSize) > width) {
+            text = text.slice(0, -1);
+          }
+          text = `${text}${suffix}`;
+        }
+        page.drawText(text, { x, y, size: fontSize, font, color: ink });
+      };
+      const fitCellText = (value, left, right, y, size) => {
+        const width = right - left - 6;
+        let fontSize = size;
+        const text = String(value ?? '').trim();
+        while (fontSize > 5 && font.widthOfTextAtSize(text, fontSize) > width) {
+          fontSize = Math.max(5, fontSize - 0.25);
+        }
+        const textWidth = Math.min(font.widthOfTextAtSize(text, fontSize), width);
+        fitText(text, left + 3 + (width - textWidth) / 2, y, width, fontSize);
+      };
+
+      page.drawRectangle({
+        x: 98, y: 632, width: 300, height: 10,
+        color: rgb(1, 1, 1)
+      });
+      page.drawRectangle({
+        x: 449, y: 632, width: 112, height: 10,
+        color: rgb(1, 1, 1)
+      });
+      fitText(request.office || '—', 101, 633.75, 290, 8, 6);
+      fitText(reference, 452, 633.75, 105, 8, 5);
+
+      const description = [item.id, item.name, item.description]
+        .filter(Boolean)
+        .join(' — ');
+      const available = Number(item.quantity) >= requestedQuantity;
+      const issuanceRemarks = remarks || '';
+      const firstRowBaseline = 557.13;
+      fitCellText(item.unit, 64.83, 95.83, firstRowBaseline, 7.4);
+      fitText(description, 100, firstRowBaseline, 248, 8, 5);
+      fitCellText(String(requestedQuantity), 352.9, 397.52, firstRowBaseline, 8);
+      fitCellText(available ? 'X' : '', 397.93, 424.52, firstRowBaseline, 8);
+      fitCellText(available ? '' : 'X', 424.93, 455.95, firstRowBaseline, 8);
+      fitCellText(String(quantity), 456.55, 505.55, firstRowBaseline, 8);
+      fitText(issuanceRemarks, 508, firstRowBaseline, 55, 7, 5);
+
+      const purpose = String(request.remarks || '—').replace(/[\r\n\t]+/g, ' ').trim();
+      const purposeSize = 8;
+      const purposeLines = [];
+      let currentLine = '';
+      let purposeTruncated = false;
+      for (const word of purpose.split(/\s+/)) {
+        const nextLine = currentLine ? `${currentLine} ${word}` : word;
+        if (font.widthOfTextAtSize(nextLine, purposeSize) > 465 && currentLine) {
+          if (purposeLines.length === 0) {
+            purposeLines.push(currentLine);
+            currentLine = word;
+          } else {
+            currentLine = `${currentLine}...`;
+            purposeTruncated = true;
+            break;
+          }
+        } else {
+          currentLine = nextLine;
+        }
+      }
+      if (currentLine) purposeLines.push(currentLine);
+      if (purposeTruncated && purposeLines.length === 1) purposeLines[0] += '...';
+      fitText(purposeLines[0] || '—', 108, 366.47, 461, purposeSize);
+      if (purposeLines[1]) fitText(purposeLines[1], 108, 354.5, 461, purposeSize);
+
+      const requestedDate = formatDocumentDate(request.date || request.createdAt);
+      const approvedDate = formatDocumentDate(request.reviewedAt || issueDate);
+      const issuedDate = formatDocumentDate(issueDate);
+      const signatureNames = [
+        [requestedBy, 109, 292.27, 180],
+        [approvedBy, 337, 292.27, 181],
+        [supplyOfficeHead.name, 110, 209.45, 180],
+        [requestedBy, 337, 209.45, 181]
+      ];
+      signatureNames.forEach(([name, x, y, width]) => fitText(name, x, y, width, 9, 4.5));
+      fitText(requestedDate, 103, 265.05, 186, 8, 6);
+      fitText(approvedDate, 330, 265.05, 187, 8, 6);
+      fitText(issuedDate, 103, 173.65, 186, 8, 6);
+      fitText(issuedDate, 330, 180.25, 187, 8, 6);
+
+      const bytes = await pdfDocument.save();
+      pdfUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+      printWindow.location.href = pdfUrl;
+      printWindow.addEventListener('load', () => {
+        window.setTimeout(() => {
+          if (printWindow.closed) return;
+          try {
+            printWindow.focus();
+            printWindow.print();
+          } catch (error) {
+            showToast(`The filled PDF is open, but printing could not start: ${error.message}`);
+          }
+        }, 800);
+      }, { once: true });
+
+      let closeMonitor;
+      const cleanup = () => {
+        if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+        if (closeMonitor) window.clearInterval(closeMonitor);
+      };
+      closeMonitor = window.setInterval(() => {
+        if (printWindow.closed) {
+          cleanup();
+        }
+      }, 1000);
+    } catch (error) {
+      if (!printWindow.closed) printWindow.close();
+      throw error;
+    }
+  }
+
+  async function printSupplyDocument(type) {
+    if (type !== 'receipt' && type !== 'ris') {
+      showToast('This document type cannot be printed.');
+      return;
+    }
+
     let request;
     let item;
     let issuance = null;
@@ -164,7 +338,6 @@ window.IMS.pageFeatures.push(() => {
     let requestingAccount = null;
     let requestedBy = '';
     let approvedBy = '';
-    let approvedByTitle = '';
     let supplyOfficeHead = null;
     if (type === 'receipt') {
       issuance = lastIssuance;
@@ -200,8 +373,7 @@ window.IMS.pageFeatures.push(() => {
       const requesterIsOfficeHead = requestingAccount?.title && /\bhead\b/i.test(requestingAccount.title);
       approvedBy = requesterIsOfficeHead
         ? requestedBy
-        : 'Atty. Engr. Arch. Emerson P. Elopre, JD, MIT, MSM, RN, RMP, RME, LPT Jr.';
-      approvedByTitle = requesterIsOfficeHead ? requestingAccount.title : 'Head of Office';
+        : 'Atty. Engr. Arch. Emerson P. Elopre';
       supplyOfficeHead = window.IMS.accounts.getSupplyOfficeHead();
       if (!supplyOfficeHead?.name) {
         showToast('The Head of Supply Office account is not configured.');
@@ -211,84 +383,57 @@ window.IMS.pageFeatures.push(() => {
       reference = request.id;
     }
 
-    const title = type === 'receipt' ? 'SUPPLY ISSUANCE RECEIPT' : 'REQUISITION AND ISSUE SLIP (RIS)';
-    const dateText = value => {
-      if (!value) return '—';
-      const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
-        ? new Date(`${value}T00:00:00`)
-        : new Date(value);
-      return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en', {
-        day: 'numeric', month: 'long', year: 'numeric'
-      }).format(date);
-    };
+    if (type === 'ris') {
+      const requestedQuantity = Number.parseFloat(String(request.quantity));
+      if (!Number.isFinite(requestedQuantity) || requestedQuantity <= 0) {
+        showToast('The approved request does not contain a valid requested quantity.');
+        return;
+      }
+      await printRequisitionIssueSlip({
+        request,
+        item,
+        quantity,
+        requestedQuantity,
+        issueDate,
+        reference,
+        requestedBy,
+        approvedBy,
+        supplyOfficeHead,
+        remarks: form.querySelector('textarea')?.value.trim() || ''
+      });
+      return;
+    }
+
+    const title = 'SUPPLY ISSUANCE RECEIPT';
     printDocument.replaceChildren();
-    printDocument.classList.toggle('ims-print-ris-document', type !== 'receipt');
+    printDocument.classList.remove('ims-print-ris-document');
     const masthead = document.createElement('header');
     masthead.className = 'ims-print-masthead';
     const logo = document.createElement('img');
     logo.src = '../Image/logo.png';
     logo.alt = 'CBSUA';
-    if (type === 'receipt') {
-      const school = document.createElement('div');
-      school.append(
-        makeTextElement('p', 'ims-print-university', 'Central Bicol State University of Agriculture'),
-        makeTextElement('p', '', 'Sipocot Campus'),
-        makeTextElement('p', 'ims-print-office', 'SUPPLY OFFICE')
-      );
-      masthead.append(logo, school);
-      printDocument.append(masthead, makeTextElement('h1', 'ims-print-title', title));
-    } else {
-      masthead.classList.add('ims-print-ris-masthead');
-      logo.className = 'ims-print-ris-seal';
-      const bagongPilipinasLogo = document.createElement('img');
-      bagongPilipinasLogo.src = '../Image/ris-bagong-pilipinas.jpg';
-      bagongPilipinasLogo.alt = 'Bagong Pilipinas';
-      bagongPilipinasLogo.className = 'ims-print-ris-bagong-logo';
-      const certificationLogo = document.createElement('img');
-      certificationLogo.src = '../Image/ris-certification.jpg';
-      certificationLogo.alt = 'TUV Rheinland ISO certification';
-      certificationLogo.className = 'ims-print-ris-certification-logo';
-      const school = document.createElement('div');
-      school.className = 'ims-print-ris-school';
-      school.append(
-        makeTextElement('p', '', 'Republic of the Philippines'),
-        makeTextElement('p', 'ims-print-university', 'CENTRAL BICOL STATE UNIVERSITY OF AGRICULTURE'),
-        makeTextElement('p', '', 'Impig, Sipocot, Camarines Sur 4408'),
-        makeTextElement('p', '', 'Website: www.cbsua.edu.ph'),
-        makeTextElement('p', '', 'Email Address: cbsua.sipocot@cbsua.edu.ph'),
-        makeTextElement('p', '', 'Trunkline: (054) 881-6681')
-      );
-      masthead.append(logo, bagongPilipinasLogo, school, certificationLogo);
-      printDocument.append(
-        masthead,
-        makeTextElement('h1', 'ims-print-title ims-print-ris-title', 'REQUISITION AND ISSUE SLIP'),
-        makeTextElement('p', 'ims-print-ris-subtitle', '(RIS)')
-      );
-    }
+    const school = document.createElement('div');
+    school.append(
+      makeTextElement('p', 'ims-print-university', 'Central Bicol State University of Agriculture'),
+      makeTextElement('p', '', 'Sipocot Campus'),
+      makeTextElement('p', 'ims-print-office', 'SUPPLY OFFICE')
+    );
+    masthead.append(logo, school);
+    printDocument.append(masthead, makeTextElement('h1', 'ims-print-title', title));
 
     const metadata = document.createElement('dl');
-    metadata.className = type === 'receipt'
-      ? 'ims-print-metadata'
-      : 'ims-print-metadata ims-print-ris-metadata';
-    const metadataFields = type === 'receipt'
-      ? [
-        ['Document reference', reference],
-        ['Issuance reference', issuance.id],
-        ['Request reference', request.id],
-        ['Date', dateText(issueDate)],
-        ['Requesting office', request.office],
-        ['Recipient', request.recipient],
-        ['Employee ID', request.employeeId || issuance.recipientEmployeeId || '—'],
-        ['Approved by', request.reviewedBy || 'Supply Office'],
-        ['Released by', issuance.handledBy || form.querySelector('#issueHandler').value]
-      ]
-      : [
-        ['Entity/Name', 'CENTRAL BICOL STATE UNIVERSITY OF AGRICULTURE-SIPOCOT'],
-        ['Fund Cluster', '____________'],
-        ['Office', request.office || '—'],
-        ['RIS No.', reference]
-      ];
-    metadataFields.forEach(([label, value]) => {
+    metadata.className = 'ims-print-metadata';
+    [
+      ['Document reference', reference],
+      ['Issuance reference', issuance.id],
+      ['Request reference', request.id],
+      ['Date', formatDocumentDate(issueDate)],
+      ['Requesting office', request.office],
+      ['Recipient', request.recipient],
+      ['Employee ID', request.employeeId || issuance.recipientEmployeeId || '—'],
+      ['Approved by', request.reviewedBy || 'Supply Office'],
+      ['Released by', issuance.handledBy || form.querySelector('#issueHandler').value]
+    ].forEach(([label, value]) => {
       const row = document.createElement('div');
       row.className = 'ims-print-metadata-row';
       row.append(makeTextElement('dt', '', label), makeTextElement('dd', '', value));
@@ -297,132 +442,50 @@ window.IMS.pageFeatures.push(() => {
     printDocument.append(metadata);
 
     const table = document.createElement('table');
-    table.className = type === 'receipt' ? 'ims-print-items' : 'ims-print-items ims-print-ris-table';
+    table.className = 'ims-print-items';
     const head = document.createElement('thead');
     const body = document.createElement('tbody');
-    if (type === 'receipt') {
-      const headingRow = document.createElement('tr');
-      ['Item code', 'Description', 'Quantity', 'Unit'].forEach(label =>
-        headingRow.append(makeTextElement('th', '', label)));
-      head.append(headingRow);
-      const itemRow = document.createElement('tr');
-      [
-        item.id,
-        `${item.name}${item.description ? ` — ${item.description}` : ''}`,
-        String(quantity),
-        item.unit
-      ].forEach(value => itemRow.append(makeTextElement('td', '', value)));
-      body.append(itemRow);
-    } else {
-      const groupRow = document.createElement('tr');
-      const stockNumber = makeTextElement('th', '', 'Stock No.');
-      stockNumber.rowSpan = 2;
-      const unit = makeTextElement('th', '', 'Unit');
-      unit.rowSpan = 2;
-      const requisition = makeTextElement('th', '', 'Requisition');
-      requisition.colSpan = 2;
-      const availability = makeTextElement('th', '', 'Stock Available?');
-      availability.colSpan = 2;
-      const issuanceHeading = makeTextElement('th', '', 'Issuance');
-      issuanceHeading.colSpan = 2;
-      groupRow.append(stockNumber, unit, requisition, availability, issuanceHeading);
-      const detailRow = document.createElement('tr');
-      ['Particulars / Description', 'Quantity', 'Yes', 'No', 'Quantity', 'Remarks']
-        .forEach(label => detailRow.append(makeTextElement('th', '', label)));
-      head.append(groupRow, detailRow);
-
-      const requestedQuantity = Number.parseFloat(String(request.quantity));
-      if (!Number.isFinite(requestedQuantity) || requestedQuantity <= 0) {
-        showToast('The approved request does not contain a valid requested quantity.');
-        return;
-      }
-      const columns = document.createElement('colgroup');
-      ['9%', '7%', '41%', '8%', '4%', '4%', '10%', '17%'].forEach(width => {
-        const column = document.createElement('col');
-        column.style.width = width;
-        columns.append(column);
-      });
-      table.append(columns);
-      for (let rowNumber = 1; rowNumber <= 10; rowNumber += 1) {
-        const itemRow = document.createElement('tr');
-        const values = rowNumber === 1
-          ? [
-            String(rowNumber),
-            item.unit,
-            `${item.id} — ${item.name}${item.description ? ` — ${item.description}` : ''}`,
-            String(requestedQuantity),
-            item.quantity >= requestedQuantity ? 'X' : '',
-            item.quantity < requestedQuantity ? 'X' : '',
-            String(quantity),
-            form.querySelector('textarea')?.value.trim() || ''
-          ]
-          : [rowNumber <= 5 ? String(rowNumber) : '', '', '', '', '', '', '', ''];
-        values.forEach(value => itemRow.append(makeTextElement('td', '', value)));
-        body.append(itemRow);
-      }
-    }
+    const headingRow = document.createElement('tr');
+    ['Item code', 'Description', 'Quantity', 'Unit'].forEach(label =>
+      headingRow.append(makeTextElement('th', '', label)));
+    head.append(headingRow);
+    const itemRow = document.createElement('tr');
+    [
+      item.id,
+      `${item.name}${item.description ? ` — ${item.description}` : ''}`,
+      String(quantity),
+      item.unit
+    ].forEach(value => itemRow.append(makeTextElement('td', '', value)));
+    body.append(itemRow);
     table.append(head, body);
     printDocument.append(table);
-    if (type === 'receipt') {
-      printDocument.append(makeTextElement(
-        'p',
-        'ims-print-note',
-        'This document confirms the supply issuance recorded by the CBSUA Supply Office.'
-      ));
-    } else {
-      const purpose = document.createElement('p');
-      purpose.className = 'ims-print-purpose';
-      purpose.append(
-        makeTextElement('span', 'ims-print-purpose-label', 'Purpose:'),
-        document.createTextNode(` ${request.remarks || '—'}`)
-      );
-      printDocument.append(purpose);
-    }
+    printDocument.append(makeTextElement(
+      'p',
+      'ims-print-note',
+      'This document confirms the supply issuance recorded by the CBSUA Supply Office.'
+    ));
 
     const signatures = document.createElement('section');
-    signatures.className = type === 'receipt'
-      ? 'ims-print-signatures'
-      : 'ims-print-signatures ims-print-signatures-ris ims-print-ris-signatures';
-    const signatories = type === 'receipt'
-      ? [
-        ['Received by', request.recipient, 'Signature / Date'],
-        ['Released by', issuance.handledBy || form.querySelector('#issueHandler').value, 'Signature / Date'],
-        ['Approved by', request.reviewedBy || 'Supply Office', 'Signature / Date']
-      ]
-      : [
-        ['Requested By', requestedBy, dateText(request.date || request.createdAt), ''],
-        ['Approved By', approvedBy, dateText(request.reviewedAt || issueDate), approvedByTitle],
-        ['Issued By', supplyOfficeHead.name, dateText(issueDate), supplyOfficeHead.title || 'Supply Officer'],
-        ['Received By', requestedBy, dateText(issueDate), '']
-      ];
-    signatories.forEach(([label, name, caption, designation]) => {
+    signatures.className = 'ims-print-signatures';
+    const signatories = [
+      ['Received by', request.recipient, 'Signature / Date'],
+      ['Released by', issuance.handledBy || form.querySelector('#issueHandler').value, 'Signature / Date'],
+      ['Approved by', request.reviewedBy || 'Supply Office', 'Signature / Date']
+    ];
+    signatories.forEach(([label, name, caption]) => {
       const block = document.createElement('div');
-      block.className = type === 'receipt'
-        ? 'ims-print-signature'
-        : 'ims-print-signature ims-print-ris-signature';
-      if (type === 'receipt') {
-        block.append(
-          makeTextElement('p', 'ims-print-signature-label', label),
-          makeTextElement('p', 'ims-print-signature-name', name),
-          makeTextElement('p', 'ims-print-signature-caption', caption)
-        );
-      } else {
-        block.append(
-          makeTextElement('p', 'ims-print-signature-label', label),
-          makeTextElement('p', 'ims-print-signature-name', `Name: ${name}`),
-          ...(designation ? [makeTextElement('p', 'ims-print-signature-caption', designation)] : []),
-          makeTextElement('p', 'ims-print-signature-date', `Date: ${caption}`)
-        );
-      }
+      block.className = 'ims-print-signature';
+      block.append(
+        makeTextElement('p', 'ims-print-signature-label', label),
+        makeTextElement('p', 'ims-print-signature-name', name),
+        makeTextElement('p', 'ims-print-signature-caption', caption)
+      );
       signatures.append(block);
     });
     printDocument.append(signatures);
-    if (type !== 'receipt') {
-      printDocument.append(makeTextElement('p', 'ims-print-page-number', 'Page 1 of 1'));
-    }
 
     const originalTitle = document.title;
-    document.title = `CBSUA-${type === 'receipt' ? 'Receipt' : 'Requisition-and-Issue-Slip'}-${reference}`;
+    document.title = `CBSUA-Receipt-${reference}`;
     printDocument.hidden = false;
     window.addEventListener('afterprint', () => {
       printDocument.hidden = true;
@@ -432,7 +495,14 @@ window.IMS.pageFeatures.push(() => {
   }
 
   document.querySelectorAll('[data-issue-document]').forEach(button => {
-    button.addEventListener('click', () => printSupplyDocument(button.dataset.issueDocument));
+    button.addEventListener('click', () => {
+      const type = button.dataset.issueDocument;
+      printSupplyDocument(type).catch(error => {
+        console.error('Could not generate the requested print document.', error);
+        const documentName = type === 'receipt' ? 'receipt' : 'Requisition and Issue Slip';
+        showToast(`Could not create the ${documentName}: ${error.message}`);
+      });
+    });
   });
   window.addEventListener('ims:issuance-saved', event => {
     lastIssuance = event.detail;
