@@ -243,12 +243,36 @@
   <div id="requestModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
     <div class="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 m-4">
       <div class="flex justify-between items-center mb-6">
-        <h3 class="text-xl font-bold">Create an office stock request</h3>
+      <h3 class="text-xl font-bold" data-request-dialog-title data-default-title="Create an office stock request">Create an office stock request</h3>
         <button type="button" data-close-modal class="text-cbsua-muted hover:text-black" aria-label="Close dialog">✕</button>
       </div>
-      <form id="requestForm" class="space-y-5">
+    <section data-request-classification-step aria-labelledby="requestClassificationTitle">
+      <h4 id="requestClassificationTitle" class="font-semibold">Choose a Supply Classification</h4>
+      <p class="mt-1 mb-4 text-sm text-cbsua-muted">Select the classification to open its matching request form.</p>
+      <div class="grid gap-3 sm:grid-cols-3">
+        <button type="button" data-select-supply-classification="consumable" class="rounded-lg border border-cbsua-border p-4 text-left hover:border-cbsua-primary hover:bg-cbsua-pale">
+          <span class="block font-semibold">Consumable</span>
+          <span class="mt-1 block text-sm text-cbsua-muted">RIS · Requisition and Issue Slip</span>
+        </button>
+        <button type="button" data-select-supply-classification="semi-expendable" class="rounded-lg border border-cbsua-border p-4 text-left hover:border-cbsua-primary hover:bg-cbsua-pale">
+          <span class="block font-semibold">Semi Expendable</span>
+          <span class="mt-1 block text-sm text-cbsua-muted">ICS · Inventory Custodian Slip</span>
+        </button>
+        <button type="button" data-select-supply-classification="fixed-asset" class="rounded-lg border border-cbsua-border p-4 text-left hover:border-cbsua-primary hover:bg-cbsua-pale">
+          <span class="block font-semibold">Fixed Asset (PPE)</span>
+          <span class="mt-1 block text-sm text-cbsua-muted">PAR · Property Acknowledgment Receipt</span>
+        </button>
+      </div>
+    </section>
+    <form id="requestForm" class="space-y-5" hidden>
         <input id="requestId" name="requestId" type="hidden" value="" readonly />
         <input id="requestDate" name="requestDate" type="hidden" value="" />
+      <input id="requestSupplyClassification" name="supplyClassification" type="hidden" />
+      <input id="requestFormDocumentType" name="documentType" type="hidden" />
+      <div class="flex items-center justify-between gap-3 rounded-lg bg-cbsua-pale p-3" role="status" aria-live="polite">
+        <p data-request-form-summary class="font-medium"></p>
+        <button type="button" data-change-supply-classification class="shrink-0 text-sm font-medium text-cbsua-primary hover:underline">Change</button>
+      </div>
         <div>
           <label class="block font-medium mb-2">Requesting office *</label>
           <input id="requestOffice" type="text" class="w-full px-4 py-2.5 border border-cbsua-border rounded-lg bg-gray-50" value="Supply Office" readonly required />
@@ -278,6 +302,80 @@
         <div>
           <label class="block font-medium mb-2">Purpose / Remarks</label>
           <textarea id="requestRemarks" class="w-full px-4 py-2.5 border border-cbsua-border rounded-lg" rows="2" placeholder="Briefly describe intended use"></textarea>
+        </div>
+        <div data-request-classification-fields="consumable" hidden>
+          <div class="rounded-lg border border-cbsua-border p-4">
+            <h4 class="font-semibold">RIS form details</h4>
+            <label class="mb-2 mt-4 block font-medium" for="requestFundCluster">Fund Cluster</label>
+            <input id="requestFundCluster" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
+          </div>
+        </div>
+        <div data-request-classification-fields="semi-expendable" hidden>
+          <div class="space-y-4 rounded-lg border border-cbsua-border p-4">
+            <h4 class="font-semibold">ICS form details</h4>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="mb-2 block font-medium" for="requestUsefulLife">Estimated useful life (years) *</label>
+                <input id="requestUsefulLife" type="number" min="1" step="0.5" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" data-classification-required="semi-expendable" />
+              </div>
+              <div>
+                <label class="mb-2 block font-medium" for="requestIcsUnitCost">Unit cost</label>
+                <input id="requestIcsUnitCost" type="number" min="0" step="0.01" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
+              </div>
+              <div>
+                <label class="mb-2 block font-medium" for="requestIcsSupplier">Supplier</label>
+                <input id="requestIcsSupplier" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
+              </div>
+              <div>
+                <label class="mb-2 block font-medium" for="requestIcsDeliveryReceiptDate">DR Date</label>
+                <input id="requestIcsDeliveryReceiptDate" type="date" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
+              </div>
+              <div>
+                <label class="mb-2 block font-medium" for="requestIcsPurchaseOrderNumber">P.O. No.</label>
+                <input id="requestIcsPurchaseOrderNumber" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
+              </div>
+              <div>
+                <label class="mb-2 block font-medium" for="requestIcsPurchaseOrderDate">P.O. Date</label>
+                <input id="requestIcsPurchaseOrderDate" type="date" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
+              </div>
+              <div>
+                <label class="mb-2 block font-medium" for="requestIcsIarNumber">IAR Number</label>
+                <input id="requestIcsIarNumber" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
+              </div>
+              <div>
+                <label class="mb-2 block font-medium" for="requestIcsIarDate">IAR Date</label>
+                <input id="requestIcsIarDate" type="date" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
+              </div>
+            </div>
+            <p class="text-xs text-cbsua-muted">Unit cost is used to calculate the total cost on the ICS. Purchase and receipt references can be added when available.</p>
+          </div>
+        </div>
+        <div data-request-classification-fields="fixed-asset" hidden>
+          <div class="space-y-4 rounded-lg border border-cbsua-border p-4">
+            <h4 class="font-semibold">PAR form details</h4>
+            <div>
+              <label class="mb-2 block font-medium" for="requestSpecifications">Description *</label>
+              <textarea id="requestSpecifications" rows="2" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" data-classification-required="fixed-asset" placeholder="Describe the property for the PAR"></textarea>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="mb-2 block font-medium" for="requestParPropertyNumber">Property Number</label>
+                <input id="requestParPropertyNumber" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
+              </div>
+              <div>
+                <label class="mb-2 block font-medium" for="requestParDateAcquired">Date Acquired</label>
+                <input id="requestParDateAcquired" type="date" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
+              </div>
+              <div>
+                <label class="mb-2 block font-medium" for="requestParAmount">Amount</label>
+                <input id="requestParAmount" type="number" min="0" step="0.01" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
+              </div>
+              <div>
+                <label class="mb-2 block font-medium" for="requestParSupplier">Supplier</label>
+                <input id="requestParSupplier" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
+              </div>
+            </div>
+          </div>
         </div>
         <div class="flex justify-end gap-3 pt-2">
           <button type="button" data-close-modal class="px-4 py-2 border border-cbsua-border rounded-lg font-medium hover:bg-gray-50">Cancel</button>

@@ -36,7 +36,10 @@ window.IMS.pageFeatures.push(() => {
     itemName.textContent = request.item || 'Item not recorded';
     const itemQuantity = document.createElement('p');
     itemQuantity.className = 'text-xs text-cbsua-muted';
-    itemQuantity.textContent = request.quantity || 'Quantity not recorded';
+    const formSummary = request.documentType
+      ? `${request.supplyClassification || 'Classification not set'} · ${request.documentType}`
+      : 'Existing request';
+    itemQuantity.textContent = [request.quantity || 'Quantity not recorded', formSummary].join(' · ');
     itemCell.append(itemName, itemQuantity);
 
     const statusCell = document.createElement('td');

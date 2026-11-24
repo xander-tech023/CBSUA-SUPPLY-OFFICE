@@ -89,7 +89,8 @@ window.IMS.pageFeatures.push(() => {
       const status = (request.status || 'Pending').toLowerCase();
       const searchableText = [
         request.id, request.date, request.office, request.recipient,
-        request.employeeId, request.item, request.quantity
+        request.employeeId, request.item, request.quantity,
+        request.supplyClassification, request.documentType
       ].map(value => value || '').join(' ').toLowerCase();
       return (!statusFilter || status === statusFilter)
         && (!searchTerm || searchableText.includes(searchTerm))
@@ -154,7 +155,12 @@ window.IMS.pageFeatures.push(() => {
           request.recipient,
           request.employeeId ? `ID ${request.employeeId}` : ''
         ].filter(Boolean).join(' · ')),
-        detail('Item / Quantity', request.item, request.quantity)
+        detail('Item / Quantity', request.item, [
+          request.quantity,
+          request.documentType
+            ? `${request.supplyClassification || 'Classification not set'} · ${request.documentType}`
+            : 'Existing request'
+        ].filter(Boolean).join(' · '))
       );
       card.append(header, details);
 

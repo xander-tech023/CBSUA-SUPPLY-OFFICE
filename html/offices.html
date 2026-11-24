@@ -335,12 +335,12 @@
     });
 
     document.getElementById("newOfficeRequest").addEventListener("click", () => {
-      window.location.href = "stock_request.html";
+      window.location.href = "stock_request.html?newRequest=1";
     });
     grid.addEventListener("click", event => {
       const button = event.target.closest(".office-request");
       if (button) {
-        window.location.href = `stock_request.html?office=${encodeURIComponent(button.dataset.office)}`;
+        window.location.href = `stock_request.html?newRequest=1&office=${encodeURIComponent(button.dataset.office)}`;
         return;
       }
       const detailsButton = event.target.closest(".office-details");

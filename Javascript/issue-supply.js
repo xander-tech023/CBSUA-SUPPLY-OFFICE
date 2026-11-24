@@ -24,7 +24,13 @@ window.IMS.pageFeatures.push(() => {
     handler: document.getElementById('issueAuditHandler'),
     date: document.getElementById('issueAuditDate')
   };
+  const officialFormButton = document.querySelector('[data-issue-document="form"]');
   const receiptButton = document.querySelector('[data-issue-document="receipt"]');
+  const officialFormNames = {
+    RIS: 'Requisition and Issue Slip',
+    ICS: 'Inventory Custodian Slip',
+    PAR: 'Property Acknowledgment Receipt'
+  };
   const header = document.querySelector('main .border-2');
   let selectedItem = null;
   let selectedRequest = null;
@@ -44,6 +50,11 @@ window.IMS.pageFeatures.push(() => {
   function updatePreview(resetQuantity = false) {
     selectedRequest = getLocalRecords('requests').find(request => request.id === requestSelect.value);
     selectedItem = selectedRequest && getLocalRecords('items').find(item => item.id === selectedRequest.itemId);
+    const documentType = selectedRequest?.documentType || 'RIS';
+    if (officialFormButton) {
+      officialFormButton.textContent = `Print ${documentType} — ${officialFormNames[documentType] || 'official form'}`;
+      officialFormButton.disabled = !selectedRequest || !selectedItem || !officialFormNames[documentType];
+    }
     if (!selectedRequest || !selectedItem) {
       itemInput.value = '';
       itemIdInput.value = '';
@@ -95,7 +106,7 @@ window.IMS.pageFeatures.push(() => {
       header.querySelector('span').textContent = 'Approved · Ready to issue';
       header.querySelector('h5').textContent = `${selectedRequest.id} — ${selectedItem.name}`;
       const details = header.querySelector('p');
-      if (details) details.textContent = `Approved by ${selectedRequest.reviewedBy || 'Supply Office'} · ${selectedRequest.date} · Remaining ${remaining} ${selectedItem.unit}`;
+      if (details) details.textContent = `${selectedRequest.documentType || 'RIS'} · Approved by ${selectedRequest.reviewedBy || 'Supply Office'} · ${selectedRequest.date} · Remaining ${remaining} ${selectedItem.unit}`;
     }
 
     const currentBalance = selectedItem.quantity;
@@ -130,7 +141,7 @@ window.IMS.pageFeatures.push(() => {
       const item = getLocalRecords('items').find(entry => entry.id === request.itemId);
       const option = document.createElement('option');
       option.value = request.id;
-      option.textContent = `${request.id} · ${item.name} · ${request.quantity}`;
+      option.textContent = `${request.id} · ${request.documentType || 'RIS'} · ${item.name} · ${request.quantity}`;
       requestSelect.append(option);
     });
     if (!requests.length) {
@@ -164,6 +175,46 @@ window.IMS.pageFeatures.push(() => {
     }).format(date);
   }
 
+  function createPdfTextHelpers(page, font, rgb) {
+    const ink = rgb(0, 0, 0);
+    const fitText = (value, x, y, width, size = 8, minSize = 5) => {
+      let text = String(value ?? '').replace(/[\r\n\t]+/g, ' ').trim();
+      if (!text) return;
+      let fontSize = size;
+      while (fontSize > minSize && font.widthOfTextAtSize(text, fontSize) > width) {
+        fontSize = Math.max(minSize, fontSize - 0.25);
+      }
+      if (font.widthOfTextAtSize(text, fontSize) > width) {
+        const suffix = '...';
+        while (text && font.widthOfTextAtSize(`${text}${suffix}`, fontSize) > width) {
+          text = text.slice(0, -1);
+        }
+        text = `${text}${suffix}`;
+      }
+      page.drawText(text, { x, y, size: fontSize, font, color: ink });
+    };
+    const fitCellText = (value, left, right, y, size = 7) => {
+      const text = String(value ?? '').trim();
+      if (!text) return;
+      const width = right - left - 6;
+      let fontSize = size;
+      while (fontSize > 5 && font.widthOfTextAtSize(text, fontSize) > width) {
+        fontSize = Math.max(5, fontSize - 0.25);
+      }
+      const textWidth = Math.min(font.widthOfTextAtSize(text, fontSize), width);
+      fitText(text, left + 3 + (width - textWidth) / 2, y, width, fontSize);
+    };
+    const drawLinedValue = (value, x, y, width, size = 8) => {
+      if (!String(value ?? '').trim()) return;
+      page.drawRectangle({
+        x, y: y - 2, width, height: 13,
+        color: rgb(1, 1, 1)
+      });
+      fitText(value, x + 2, y, width - 4, size);
+    };
+    return { fitText, fitCellText, drawLinedValue };
+  }
+
   async function printRequisitionIssueSlip({
     request, item, quantity, requestedQuantity, issueDate, reference,
     requestedBy, approvedBy, supplyOfficeHead, remarks
@@ -185,7 +236,7 @@ window.IMS.pageFeatures.push(() => {
         throw new Error('The PDF form library did not load. Run npm install and reload this page.');
       }
 
-      const templateUrl = new URL('../Requisition_and_Issue_Slip.pdf', window.location.href);
+      const templateUrl = new URL('../Forms/Requisition_and_Issue_Slip.pdf', window.location.href);
       const response = await fetch(templateUrl);
       if (!response.ok) {
         throw new Error(`Could not load the supplied RIS form (HTTP ${response.status}).`);
@@ -199,33 +250,7 @@ window.IMS.pageFeatures.push(() => {
       }
 
       const font = await pdfDocument.embedFont(StandardFonts.TimesRoman);
-      const ink = rgb(0, 0, 0);
-      const fitText = (value, x, y, width, size, minSize = 5) => {
-        let text = String(value ?? '').replace(/[\r\n\t]+/g, ' ').trim();
-        if (!text) return;
-        let fontSize = size;
-        while (fontSize > minSize && font.widthOfTextAtSize(text, fontSize) > width) {
-          fontSize = Math.max(minSize, fontSize - 0.25);
-        }
-        if (font.widthOfTextAtSize(text, fontSize) > width) {
-          const suffix = '...';
-          while (text && font.widthOfTextAtSize(`${text}${suffix}`, fontSize) > width) {
-            text = text.slice(0, -1);
-          }
-          text = `${text}${suffix}`;
-        }
-        page.drawText(text, { x, y, size: fontSize, font, color: ink });
-      };
-      const fitCellText = (value, left, right, y, size) => {
-        const width = right - left - 6;
-        let fontSize = size;
-        const text = String(value ?? '').trim();
-        while (fontSize > 5 && font.widthOfTextAtSize(text, fontSize) > width) {
-          fontSize = Math.max(5, fontSize - 0.25);
-        }
-        const textWidth = Math.min(font.widthOfTextAtSize(text, fontSize), width);
-        fitText(text, left + 3 + (width - textWidth) / 2, y, width, fontSize);
-      };
+      const { fitText, fitCellText } = createPdfTextHelpers(page, font, rgb);
 
       page.drawRectangle({
         x: 98, y: 632, width: 300, height: 10,
@@ -238,12 +263,13 @@ window.IMS.pageFeatures.push(() => {
       fitText(request.office || '—', 101, 633.75, 290, 8, 6);
       fitText(reference, 452, 633.75, 105, 8, 5);
 
-      const description = [item.id, item.name, item.description]
+      const description = [item.name, item.description]
         .filter(Boolean)
         .join(' — ');
       const available = Number(item.quantity) >= requestedQuantity;
       const issuanceRemarks = remarks || '';
       const firstRowBaseline = 557.13;
+      fitCellText(item.id, 28.8, 64.42, firstRowBaseline, 7.4);
       fitCellText(item.unit, 64.83, 95.83, firstRowBaseline, 7.4);
       fitText(description, 100, firstRowBaseline, 248, 8, 5);
       fitCellText(String(requestedQuantity), 352.9, 397.52, firstRowBaseline, 8);
@@ -291,6 +317,13 @@ window.IMS.pageFeatures.push(() => {
       fitText(approvedDate, 330, 265.05, 187, 8, 6);
       fitText(issuedDate, 103, 173.65, 186, 8, 6);
       fitText(issuedDate, 330, 180.25, 187, 8, 6);
+      if (request.classificationDetails?.fundCluster) {
+        page.drawRectangle({
+          x: 490, y: 644, width: 68, height: 12,
+          color: rgb(1, 1, 1)
+        });
+        fitText(request.classificationDetails.fundCluster, 492, 647.75, 63, 8, 5);
+      }
 
       const bytes = await pdfDocument.save();
       pdfUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
@@ -323,8 +356,151 @@ window.IMS.pageFeatures.push(() => {
     }
   }
 
+  async function printInventoryTemplate({
+    type, request, item, quantity, issueDate, reference,
+    requestedBy, requestingAccount, supplyOfficeHead
+  }) {
+    const templateNames = {
+      ICS: 'ICS.pdf',
+      PAR: 'PAR.pdf'
+    };
+    const templateName = templateNames[type];
+    if (!templateName) throw new Error('The selected request has no supported inventory form.');
+
+    const printWindow = window.open('about:blank', '_blank');
+    if (!printWindow) {
+      showToast(`Allow pop-ups to open and print the ${type} form.`);
+      return;
+    }
+
+    printWindow.document.title = `CBSUA-${type}-${reference}`;
+    printWindow.document.body.textContent = `Preparing the ${type} form...`;
+    try {
+      if (window.location.protocol === 'file:') {
+        throw new Error('Open this app through XAMPP/localhost so the supplied PDF can be read.');
+      }
+      if (!window.PDFLib) {
+        throw new Error('The PDF form library did not load. Run npm install and reload this page.');
+      }
+
+      const templateUrl = new URL(`../Forms/${templateName}`, window.location.href);
+      const response = await fetch(templateUrl);
+      if (!response.ok) {
+        throw new Error(`Could not load the supplied ${type} form (HTTP ${response.status}).`);
+      }
+
+      const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
+      const pdfDocument = await PDFDocument.load(await response.arrayBuffer());
+      const page = pdfDocument.getPages()[0];
+      if (!page || pdfDocument.getPageCount() !== 1) {
+        throw new Error(`The supplied ${type} form must contain exactly one page.`);
+      }
+
+      const font = await pdfDocument.embedFont(StandardFonts.TimesRoman);
+      const { fitText, fitCellText, drawLinedValue } = createPdfTextHelpers(page, font, rgb);
+      const details = request.classificationDetails || {};
+      const formattedDate = value => value ? formatDocumentDate(value) : '';
+
+      if (type === 'ICS') {
+        const unitCostValue = details.unitCost ?? item.unitCost;
+        const parsedUnitCost = unitCostValue === undefined ? null : Number(unitCostValue);
+        const unitCost = Number.isFinite(parsedUnitCost) && parsedUnitCost >= 0 ? parsedUnitCost : null;
+        const totalCost = unitCost === null ? null : unitCost * quantity;
+        const usefulLife = details.estimatedUsefulLifeYears ?? details.usefulLifeYears;
+        const description = [item.name, item.description].filter(Boolean).join(' — ');
+        const supplier = details.supplier || item.supplier || '';
+
+        page.drawRectangle({ x: 443, y: 686, width: 103, height: 15, color: rgb(1, 1, 1) });
+        fitText(reference, 446, 691.17, 96, 8, 5);
+        fitCellText(String(quantity), 51.23, 87.63, 628, 7);
+        fitCellText(item.unit, 88.22, 121.64, 628, 7);
+        fitCellText(unitCost === null ? '' : unitCost.toFixed(2), 122.25, 175.45, 628, 7);
+        fitCellText(totalCost === null ? '' : totalCost.toFixed(2), 176.05, 229.47, 628, 7);
+        fitText(description, 232, 628, 174, 7, 5);
+        fitCellText(item.id, 411.33, 478.95, 628, 7);
+        fitCellText(usefulLife === null || usefulLife === undefined ? '' : `${usefulLife} years`, 479.35, 544.18, 628, 7);
+
+        fitText(supplier, 280, 379.1, 264, 8, 5);
+        fitText(formattedDate(details.deliveryReceiptDate), 280, 351.47, 264, 8, 5);
+        fitText(details.purchaseOrderNumber, 280, 323.88, 264, 8, 5);
+        fitText(formattedDate(details.purchaseOrderDate), 280, 296.28, 264, 8, 5);
+        fitText(details.iarNumber, 280, 268.65, 264, 8, 5);
+        fitText(formattedDate(details.iarDate), 280, 241.05, 264, 8, 5);
+
+        const requesterPosition = [requestingAccount?.title, request.office].filter(Boolean).join(' / ');
+        drawLinedValue(requestedBy, 58.62, 168.65, 235, 8);
+        drawLinedValue(requesterPosition, 58.62, 131.83, 235, 8);
+        drawLinedValue(formattedDate(issueDate), 95.42, 95.03, 203, 8);
+        drawLinedValue(supplyOfficeHead.name, 305.3, 168.65, 238, 8);
+        drawLinedValue(supplyOfficeHead.title || 'Supply Office', 305.3, 131.83, 238, 8);
+        drawLinedValue(formattedDate(issueDate), 342.1, 95.03, 202, 8);
+      } else {
+        const amountValue = details.amount ?? details.estimatedAmount;
+        const parsedAmount = amountValue === undefined || amountValue === null
+          ? null
+          : Number(amountValue);
+        const unitCostValue = details.estimatedUnitCost ?? item.unitCost;
+        const parsedUnitCost = unitCostValue === undefined || unitCostValue === null
+          ? null
+          : Number(unitCostValue);
+        const amount = Number.isFinite(parsedAmount) && parsedAmount >= 0
+          ? parsedAmount
+          : Number.isFinite(parsedUnitCost) && parsedUnitCost >= 0
+            ? parsedUnitCost * quantity
+            : null;
+        const description = [item.name, details.specifications || item.description]
+          .filter(Boolean)
+          .join(' — ');
+        const supplier = details.supplier || item.supplier || '';
+
+        page.drawRectangle({ x: 460, y: 685, width: 98, height: 15, color: rgb(1, 1, 1) });
+        fitText(reference, 463, 690.78, 91, 8, 5);
+        fitCellText(String(quantity), 33.6, 88.22, 644, 7);
+        fitCellText(item.unit, 88.62, 139.24, 644, 7);
+        fitText(description, 142, 644, 235, 7, 5);
+        fitCellText(details.propertyNumber || item.propertyNumber, 380.33, 445.55, 644, 7);
+        fitCellText(formattedDate(details.dateAcquired || item.dateAcquired), 445.95, 505.15, 644, 7);
+        fitCellText(amount === null ? '' : amount.toFixed(2), 505.55, 561.78, 644, 7);
+        drawLinedValue(supplier, 81.62, 351.67, 477, 8);
+
+        const requesterPosition = [requestingAccount?.title, request.office].filter(Boolean).join(' / ');
+        drawLinedValue(requestedBy, 58.62, 283.27, 235, 8);
+        drawLinedValue(requesterPosition, 58.62, 246.45, 235, 8);
+        drawLinedValue(formattedDate(issueDate), 95.42, 209.65, 203, 8);
+        drawLinedValue(supplyOfficeHead.name, 305.3, 283.27, 238, 8);
+        drawLinedValue(supplyOfficeHead.title || 'Supply Office', 305.3, 246.45, 238, 8);
+        drawLinedValue(formattedDate(issueDate), 342.1, 209.65, 202, 8);
+      }
+
+      const bytes = await pdfDocument.save();
+      const pdfUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+      printWindow.location.href = pdfUrl;
+      printWindow.addEventListener('load', () => {
+        window.setTimeout(() => {
+          if (printWindow.closed) return;
+          try {
+            printWindow.focus();
+            printWindow.print();
+          } catch (error) {
+            showToast(`The filled ${type} form is open, but printing could not start: ${error.message}`);
+          }
+        }, 800);
+      }, { once: true });
+
+      const closeMonitor = window.setInterval(() => {
+        if (printWindow.closed) {
+          URL.revokeObjectURL(pdfUrl);
+          window.clearInterval(closeMonitor);
+        }
+      }, 1000);
+    } catch (error) {
+      if (!printWindow.closed) printWindow.close();
+      throw error;
+    }
+  }
+
   async function printSupplyDocument(type) {
-    if (type !== 'receipt' && type !== 'ris') {
+    if (type !== 'receipt' && type !== 'form' && type !== 'ris') {
       showToast('This document type cannot be printed.');
       return;
     }
@@ -383,24 +559,43 @@ window.IMS.pageFeatures.push(() => {
       reference = request.id;
     }
 
-    if (type === 'ris') {
+    if (type === 'form' || type === 'ris') {
+      const documentType = type === 'ris' ? 'RIS' : request.documentType || 'RIS';
+      if (!officialFormNames[documentType]) {
+        showToast('This request has an unsupported official form type.');
+        return;
+      }
       const requestedQuantity = Number.parseFloat(String(request.quantity));
       if (!Number.isFinite(requestedQuantity) || requestedQuantity <= 0) {
         showToast('The approved request does not contain a valid requested quantity.');
         return;
       }
-      await printRequisitionIssueSlip({
-        request,
-        item,
-        quantity,
-        requestedQuantity,
-        issueDate,
-        reference,
-        requestedBy,
-        approvedBy,
-        supplyOfficeHead,
-        remarks: form.querySelector('textarea')?.value.trim() || ''
-      });
+      if (documentType === 'RIS') {
+        await printRequisitionIssueSlip({
+          request,
+          item,
+          quantity,
+          requestedQuantity,
+          issueDate,
+          reference,
+          requestedBy,
+          approvedBy,
+          supplyOfficeHead,
+          remarks: form.querySelector('textarea')?.value.trim() || ''
+        });
+      } else {
+        await printInventoryTemplate({
+          type: documentType,
+          request,
+          item,
+          quantity,
+          issueDate,
+          reference,
+          requestedBy,
+          requestingAccount,
+          supplyOfficeHead
+        });
+      }
       return;
     }
 
@@ -499,7 +694,10 @@ window.IMS.pageFeatures.push(() => {
       const type = button.dataset.issueDocument;
       printSupplyDocument(type).catch(error => {
         console.error('Could not generate the requested print document.', error);
-        const documentName = type === 'receipt' ? 'receipt' : 'Requisition and Issue Slip';
+        const documentType = selectedRequest?.documentType || 'RIS';
+        const documentName = type === 'receipt'
+          ? 'receipt'
+          : officialFormNames[documentType] || 'official form';
         showToast(`Could not create the ${documentName}: ${error.message}`);
       });
     });

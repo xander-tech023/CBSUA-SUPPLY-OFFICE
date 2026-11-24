@@ -340,6 +340,9 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     const table = document.querySelector('main tbody');
     if (!table || !document.querySelector('#requestModal')) return;
     const existingRow = [...table.rows].find(row => row.dataset.requestId === request.id);
+    const formSummary = request.documentType
+      ? `${request.supplyClassification || 'Classification not set'} · ${request.documentType}`
+      : 'Existing request';
     const setCellDetails = (cell, title, detail) => cell.replaceChildren(
       document.createTextNode(title),
       document.createElement('br'),
@@ -352,7 +355,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
       setCellDetails(existingRow.cells[1], request.office, request.employeeId
         ? `${request.recipient} · ID ${request.employeeId}`
         : request.recipient);
-      setCellDetails(existingRow.cells[2], request.item, request.quantity);
+      setCellDetails(existingRow.cells[2], request.item, `${request.quantity} · ${formSummary}`);
       const badge = existingRow.cells[4].querySelector('span');
       if (badge) Object.assign(badge, {
         className: `badge rounded-full px-2 py-0.5 text-xs font-medium ${status === 'Approved' ? 'bg-green-100 text-green-700' : status === 'Issued' ? 'bg-blue-100 text-blue-700' : status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`,
@@ -398,7 +401,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
       ? `${request.recipient} · ID ${request.employeeId}`
       : request.recipient);
     const itemCell = addCell('');
-    setCellDetails(itemCell, request.item, request.quantity);
+    setCellDetails(itemCell, request.item, `${request.quantity} · ${formSummary}`);
     addCell(request.reviewedBy || '—');
     const status = request.status || 'Pending';
     const statusCell = addCell('');

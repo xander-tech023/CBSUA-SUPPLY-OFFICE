@@ -79,8 +79,68 @@ document.addEventListener('DOMContentLoaded', async () => {
     'suppliers.html': 'supplierModal'
   }[currentPage];
   const pageModal = modalId ? document.getElementById(modalId) : null;
+  const requestClassifications = {
+    consumable: {
+      label: 'Consumable',
+      documentType: 'RIS',
+      documentName: 'Requisition and Issue Slip'
+    },
+    'semi-expendable': {
+      label: 'Semi Expendable',
+      documentType: 'ICS',
+      documentName: 'Inventory Custodian Slip'
+    },
+    'fixed-asset': {
+      label: 'Fixed Asset (PPE)',
+      documentType: 'PAR',
+      documentName: 'Property Acknowledgment Receipt'
+    }
+  };
   let modalOpener = null;
   let previousBodyOverflowY = '';
+  function resetRequestClassification(form) {
+    if (!form) return;
+    form.hidden = true;
+    delete form.dataset.supplyClassification;
+    form.querySelector('#requestSupplyClassification').value = '';
+    form.querySelector('#requestFormDocumentType').value = '';
+    form.querySelector('[data-request-form-summary]').textContent = '';
+    const chooser = pageModal.querySelector('[data-request-classification-step]');
+    if (chooser) chooser.hidden = false;
+    const heading = pageModal.querySelector('[data-request-dialog-title]');
+    if (heading) heading.textContent = heading.dataset.defaultTitle;
+    form.querySelectorAll('[data-request-classification-fields]').forEach(section => {
+      section.hidden = true;
+      section.querySelectorAll('input, textarea, select').forEach(field => {
+        field.required = false;
+        field.value = '';
+      });
+    });
+  }
+  function selectRequestClassification(classificationKey) {
+    const form = pageModal?.querySelector('#requestForm');
+    const classification = requestClassifications[classificationKey];
+    if (!form || !classification) return;
+    form.dataset.supplyClassification = classificationKey;
+    form.querySelector('#requestSupplyClassification').value = classification.label;
+    form.querySelector('#requestFormDocumentType').value = classification.documentType;
+    form.querySelector('[data-request-form-summary]').textContent =
+      `${classification.label} · ${classification.documentType} — ${classification.documentName}`;
+    const heading = pageModal.querySelector('[data-request-dialog-title]');
+    if (heading) heading.textContent = `Create ${classification.label} request`;
+    const chooser = pageModal.querySelector('[data-request-classification-step]');
+    if (chooser) chooser.hidden = true;
+    form.querySelectorAll('[data-request-classification-fields]').forEach(section => {
+      const active = section.dataset.requestClassificationFields === classificationKey;
+      section.hidden = !active;
+      section.querySelectorAll('input, textarea, select').forEach(field => {
+        field.required = active && field.dataset.classificationRequired === classificationKey;
+        if (!active) field.value = '';
+      });
+    });
+    form.hidden = false;
+    form.querySelector('#requestItem')?.focus();
+  }
   function openModal(opener) {
     if (!pageModal) return;
     modalOpener = opener || document.activeElement;
@@ -91,10 +151,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (pageModal.id === 'requestModal') {
       const requestForm = pageModal.querySelector('#requestForm');
       if (requestForm) {
+        resetRequestClassification(requestForm);
         requestForm.querySelector('#requestId').value = nextRequestId();
         const today = new Date();
         today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
         requestForm.querySelector('#requestDate').value = today.toISOString().slice(0, 10);
+        if (currentUser.role === 'end-user') {
+          requestForm.querySelector('#requestOffice').value = currentUser.office || '';
+          requestForm.querySelector('#requestRecipient').value = currentUser.name || currentUser.username;
+          requestForm.querySelector('#requestEmployeeId').value = currentUser.employeeId || '';
+        }
+        const officeOverride = new URLSearchParams(location.search).get('office');
+        if (officeOverride) requestForm.querySelector('#requestOffice').value = officeOverride;
       }
     }
     if (pageModal.id === 'addItemModal' && !pageModal.querySelector('#addItemForm').dataset.editingItem) {
@@ -112,7 +180,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       dialog.setAttribute('aria-modal', 'true');
       dialog.setAttribute('aria-label', pageModal.querySelector('h3')?.textContent.trim() || 'Form dialog');
     }
-    pageModal.querySelector('input:not([type="hidden"]), select, textarea, button')?.focus();
+    const initialFocus = pageModal.id === 'requestModal'
+      ? pageModal.querySelector('[data-select-supply-classification]')
+      : pageModal.querySelector('input:not([type="hidden"]), select, textarea, button');
+    initialFocus?.focus();
   }
   function closeModal() {
     if (!pageModal) return;
@@ -495,6 +566,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         dialogOpener = target;
         return openHelp();
       }
+      if (target.matches('[data-select-supply-classification]')) {
+        return selectRequestClassification(target.dataset.selectSupplyClassification);
+      }
+      if (target.matches('[data-change-supply-classification]')) {
+        const requestForm = pageModal?.querySelector('#requestForm');
+        resetRequestClassification(requestForm);
+        return pageModal?.querySelector('[data-select-supply-classification]')?.focus();
+      }
       if (target.matches('[data-open-modal]')) return openModal(target);
       if (target.matches('[data-close-modal]')) {
         resetModalForm(target.closest('.fixed')?.querySelector('form'));
@@ -744,12 +823,59 @@ document.addEventListener('DOMContentLoaded', async () => {
         const itemId = form.querySelector('#requestItem').value;
         const item = getLocalRecords('items').find(entry => entry.id === itemId);
         const quantity = Number(form.querySelector('#requestQuantity').value);
+        const classificationKey = form.dataset.supplyClassification;
+        const classification = requestClassifications[classificationKey];
         if (!item || !Number.isSafeInteger(quantity) || quantity <= 0) {
           return showToast('Choose an item and enter a whole-number quantity greater than zero.');
         }
+        if (!classification) {
+          return showToast('Choose a Supply Classification before completing the request form.');
+        }
+        const classificationDetails = {};
+        if (classificationKey === 'consumable') {
+          classificationDetails.fundCluster = form.querySelector('#requestFundCluster').value.trim();
+        } else if (classificationKey === 'semi-expendable') {
+          const usefulLifeText = form.querySelector('#requestUsefulLife').value.trim();
+          const usefulLife = usefulLifeText ? Number(usefulLifeText) : null;
+          if (usefulLifeText && (!Number.isFinite(usefulLife) || usefulLife < 1)) {
+            return showToast('Estimated useful life must be at least one year.');
+          }
+          classificationDetails.estimatedUsefulLifeYears = usefulLife;
+          const unitCostText = form.querySelector('#requestIcsUnitCost').value.trim();
+          const unitCost = unitCostText ? Number(unitCostText) : null;
+          if (unitCostText && (!Number.isFinite(unitCost) || unitCost < 0)) {
+            return showToast('ICS unit cost must be zero or greater.');
+          }
+          classificationDetails.unitCost = unitCost;
+          classificationDetails.supplier = form.querySelector('#requestIcsSupplier').value.trim();
+          classificationDetails.deliveryReceiptDate = form.querySelector('#requestIcsDeliveryReceiptDate').value;
+          classificationDetails.purchaseOrderNumber = form.querySelector('#requestIcsPurchaseOrderNumber').value.trim();
+          classificationDetails.purchaseOrderDate = form.querySelector('#requestIcsPurchaseOrderDate').value;
+          classificationDetails.iarNumber = form.querySelector('#requestIcsIarNumber').value.trim();
+          classificationDetails.iarDate = form.querySelector('#requestIcsIarDate').value;
+        } else if (classificationKey === 'fixed-asset') {
+          const specifications = form.querySelector('#requestSpecifications').value.trim();
+          if (!specifications) return showToast('Enter the specifications required for the PAR request.');
+          const amountText = form.querySelector('#requestParAmount').value.trim();
+          const amount = amountText ? Number(amountText) : null;
+          if (amountText && (!Number.isFinite(amount) || amount < 0)) {
+            return showToast('PAR amount must be zero or greater.');
+          }
+          classificationDetails.specifications = specifications;
+          classificationDetails.supplier = form.querySelector('#requestParSupplier').value.trim();
+          classificationDetails.propertyNumber = form.querySelector('#requestParPropertyNumber').value.trim();
+          classificationDetails.dateAcquired = form.querySelector('#requestParDateAcquired').value;
+          classificationDetails.amount = amount;
+        }
+        const officeOverride = new URLSearchParams(location.search).get('office');
+        if (officeOverride && !window.IMS.accounts.getOfficeId(officeOverride)) {
+          return showToast('Choose a valid office for this stock request.');
+        }
+        const requestOffice = form.querySelector('#requestOffice');
         if (currentUser.role === 'admin') {
-          const requestOffice = form.querySelector('#requestOffice');
-          if (requestOffice) requestOffice.value = 'Supply Office';
+          requestOffice.value = officeOverride || 'Supply Office';
+        } else if (officeOverride) {
+          requestOffice.value = officeOverride;
         }
         const request = {
           id: nextRequestId(),
@@ -766,6 +892,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           item: item.name,
           itemId,
           quantity: `${quantity} ${item.unit}`,
+          supplyClassification: classification.label,
+          documentType: classification.documentType,
+          classificationDetails,
           status: 'Pending',
           remarks: form.querySelector('#requestRemarks').value.trim()
         };
