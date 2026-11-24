@@ -21,7 +21,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     ],
     requests: [
       {
-        id: 'REQ-2026-045',
+        id: 'REQ-2026-11-045',
         date: '2026-11-18',
         office: 'College of Education',
         recipient: 'Angelica Ramos',
@@ -36,7 +36,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
         createdAt: '2026-11-18T08:30:00'
       },
       {
-        id: 'REQ-2026-044',
+        id: 'REQ-2026-11-044',
         date: '2026-11-17',
         office: 'Registrar',
         recipient: 'Noel P. Mendoza',
@@ -51,7 +51,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
         createdAt: '2026-11-17T09:10:00'
       },
       {
-        id: 'REQ-2026-043',
+        id: 'REQ-2026-11-043',
         date: '2026-11-15',
         office: 'Campus Health Services',
         recipient: 'Liza Marie Cruz',
@@ -105,7 +105,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     issuances: [
       {
         id: 'ISS-2026-021',
-        requestId: 'REQ-2026-043',
+        requestId: 'REQ-2026-11-043',
         itemId: 'ITM-005',
         itemName: 'Ethyl alcohol, 500 mL',
         quantity: 6,
@@ -120,7 +120,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
       },
       {
         id: 'ISS-2026-020',
-        requestId: 'REQ-2026-044',
+        requestId: 'REQ-2026-11-044',
         itemId: 'ITM-003',
         itemName: 'Ballpen per pack',
         quantity: 2,
@@ -536,13 +536,33 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
       : currentPage === 'stock_request.html' ? document.querySelector('main input[type="text"]') : null;
     filter?.dispatchEvent(new Event('input', { bubbles: true }));
     const idConfig = {
-      'stock_request.html': ['#requestForm input[readonly]', 'requests', 'REQ-2026-', 44],
+      'stock_request.html': ['#requestForm input[name="requestId"]', 'request'],
       'suppliers.html': ['#supplierForm input[readonly]', 'suppliers', 'SUP-', 3]
     }[currentPage];
     if (idConfig) {
       const idField = document.querySelector(idConfig[0]);
-      if (idField) idField.value = nextRecordId(...idConfig.slice(1));
+      if (idField) idField.value = idConfig[1] === 'request' ? nextRequestId() : nextRecordId(...idConfig.slice(1));
     }
+  }
+
+  function nextRequestId() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const prefix = `REQ-${year}-${month}-`;
+    const nextNumber = getLocalRecords('requests').reduce((maximum, record) => {
+      const formatted = String(record.id || '').match(/^REQ-(\d{4})-(\d{2})-(\d{3})$/);
+      if (formatted && Number(formatted[1]) === year && Number(formatted[2]) === now.getMonth() + 1) {
+        return Math.max(maximum, Number(formatted[3]));
+      }
+      const legacy = String(record.id || '').match(/^REQ-\d{4}-(\d+)$/);
+      const recordDate = String(record.date || record.createdAt || '').slice(0, 7);
+      if (legacy && recordDate === `${year}-${month}`) {
+        return Math.max(maximum, Number(legacy[1]));
+      }
+      return maximum;
+    }, 0) + 1;
+    return `${prefix}${String(nextNumber).padStart(3, '0')}`;
   }
 
   function nextRecordId(resource, prefix, initialValue) {
@@ -566,6 +586,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     addSupplierCard,
     restoreLocalRecords,
     nextRecordId,
+    nextRequestId,
     refreshPage() {
       restoreLocalRecords();
       window.dispatchEvent(new CustomEvent('ims:records-updated'));

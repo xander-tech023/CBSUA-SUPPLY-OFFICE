@@ -158,16 +158,8 @@
         <button type="button" data-close-modal class="text-cbsua-muted hover:text-black" aria-label="Close dialog">✕</button>
       </div>
       <form id="requestForm" class="space-y-5">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label class="mb-2 block font-medium" for="requestId">Request ID</label>
-            <input id="requestId" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" readonly />
-          </div>
-          <div>
-            <label class="mb-2 block font-medium" for="requestDate">Request date *</label>
-            <input id="requestDate" type="date" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" required />
-          </div>
-        </div>
+        <input id="requestId" name="requestId" type="hidden" value="" readonly />
+        <input id="requestDate" name="requestDate" type="hidden" value="" />
         <div>
           <label class="mb-2 block font-medium" for="requestOffice">Requesting office</label>
           <input id="requestOffice" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" readonly />

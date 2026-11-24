@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const {
     getLocalRecords, saveRecord, updateRequestStatus, updateInventoryItem, updateSupplier, addInventoryRow,
-    addRequestRow, addSupplierCard, nextRecordId
+    addRequestRow, addSupplierCard, nextRecordId, nextRequestId
   } = window.IMS;
   const modalId = {
     'inventory.html': 'addItemModal',
@@ -90,10 +90,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (pageModal.id === 'requestModal') {
       const requestForm = pageModal.querySelector('#requestForm');
-      const today = new Date();
-      today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
       if (requestForm) {
-        requestForm.querySelector('#requestId').value = nextRecordId('requests', 'REQ-2026-', 44);
+        requestForm.querySelector('#requestId').value = nextRequestId();
+        const today = new Date();
+        today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
         requestForm.querySelector('#requestDate').value = today.toISOString().slice(0, 10);
       }
     }
@@ -748,8 +748,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           return showToast('Choose an item and enter a whole-number quantity greater than zero.');
         }
         const request = {
-          id: form.querySelector('#requestId').value.trim(),
-          date: form.querySelector('#requestDate').value,
+          id: nextRequestId(),
+          date: (() => {
+            const today = new Date();
+            today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+            return today.toISOString().slice(0, 10);
+          })(),
           office: form.querySelector('#requestOffice').value,
           recipient: form.querySelector('#requestRecipient').value.trim(),
           employeeId: form.querySelector('#requestEmployeeId').value.trim().toUpperCase(),

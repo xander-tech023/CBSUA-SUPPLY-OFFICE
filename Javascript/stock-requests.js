@@ -1,5 +1,5 @@
 window.IMS.pageFeatures.push(() => {
-  const { getLocalRecords, nextRecordId, showToast } = window.IMS;
+  const { getLocalRecords, nextRequestId, showToast } = window.IMS;
   const table = document.querySelector('main tbody');
   if (!table || !document.querySelector('#requestModal')) return;
 
@@ -9,7 +9,6 @@ window.IMS.pageFeatures.push(() => {
   const office = document.querySelector('main select');
   const itemSelect = document.querySelector('#requestItem');
   const idField = document.querySelector('#requestId');
-  const dateField = document.querySelector('#requestDate');
   const exportButton = document.querySelector('[data-export-requests]');
   const adminCards = document.querySelector('#adminRequestCards');
   const adminCardList = document.querySelector('#adminRequestCardList');
@@ -51,12 +50,7 @@ window.IMS.pageFeatures.push(() => {
       }
       itemSelect.disabled = itemSelect.options.length === 1 && !itemSelect.value;
     }
-    if (idField) idField.value = nextRecordId('requests', 'REQ-2026-', 44);
-    if (dateField) {
-      const today = new Date();
-      today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
-      dateField.value = today.toISOString().slice(0, 10);
-    }
+    if (idField) idField.value = nextRequestId();
   }
 
   function update() {
