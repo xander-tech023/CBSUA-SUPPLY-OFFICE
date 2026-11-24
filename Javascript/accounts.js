@@ -80,10 +80,11 @@ window.IMS = window.IMS || {};
         username: registration.username.trim().toLowerCase(),
         password: registration.password,
         name: [registration.firstName, registration.middleName, registration.surname].filter(Boolean).join(' '),
+        employeeId: registration.employeeId.trim(),
         title: registration.position.trim(),
         office: registration.office,
         email: registration.email.trim().toLowerCase(),
-        role: registration.role
+        role: 'end-user'
       };
       writeRegisteredAccount(account);
       return { ok: true, account };

@@ -49,11 +49,11 @@ document.addEventListener('DOMContentLoaded', () => {
       firstName: document.getElementById('firstName').value.trim(),
       middleName: document.getElementById('middleName').value.trim(),
       surname: document.getElementById('surname').value.trim(),
+      employeeId: document.getElementById('registerEmployeeId').value.trim(),
       username: document.getElementById('registerUsername').value.trim(),
       office: document.getElementById('registerOffice').value,
       position: document.getElementById('registerPosition').value.trim(),
       email: document.getElementById('institutionalEmail').value.trim(),
-      role: document.getElementById('registerRole').value,
       acceptedTerms: document.getElementById('acceptTerms').checked,
       password: registrationPassword.value
     };
