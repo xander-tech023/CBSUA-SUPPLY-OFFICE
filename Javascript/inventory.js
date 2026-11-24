@@ -2,6 +2,15 @@ window.IMS.pageFeatures.push(() => {
   const { getLocalRecords } = window.IMS;
   const table = document.querySelector('#itemTableBody');
   if (!table) return;
+  const movementCanvas = document.getElementById('inventoryMovementChart');
+  const movementItemFilter = document.getElementById('inventoryMovementItem');
+  const movementDescription = document.getElementById('inventoryMovementDescription');
+  const demandSummary = document.getElementById('inventoryDemandSummary');
+  const requestedTotal = document.getElementById('inventoryRequestedTotal');
+  const issuedTotal = document.getElementById('inventoryIssuedTotal');
+  const receivedTotal = document.getElementById('inventoryReceivedTotal');
+  let movementChart = null;
+  let chartUnavailableMessageShown = false;
 
   const createElement = (tag, className = '', text) => {
     const element = document.createElement(tag);
@@ -13,7 +22,7 @@ window.IMS.pageFeatures.push(() => {
   emptyRow.dataset.emptyState = 'true';
   emptyRow.hidden = true;
   const emptyCell = createElement('td', 'py-8 text-center text-cbsua-muted');
-  emptyCell.colSpan = 7;
+  emptyCell.colSpan = 8;
   const resetButton = createElement('button', 'mt-3 text-cbsua-primary underline', 'Reset filters');
   resetButton.type = 'button';
   resetButton.dataset.resetInventorySearch = '';
@@ -175,6 +184,218 @@ window.IMS.pageFeatures.push(() => {
     document.querySelector('#searchSuggestions')?.classList.add('hidden');
   }
 
+  function getMovementData(items, itemId) {
+    const selectedItem = items.find(item => item.id === itemId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Array.from({ length: 30 }, (_, index) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() - 29 + index);
+      return date;
+    });
+    const keyFor = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const totals = Object.fromEntries(days.map(date => [keyFor(date), { requested: 0, issued: 0, received: 0 }]));
+    const addTotals = (records, type, dateField) => records.forEach(record => {
+      if (!itemId || record.itemId !== itemId) return;
+      const value = record[dateField] || record.createdAt;
+      if (!value) return;
+      let dateKey;
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+        dateKey = value.slice(0, 10);
+      } else {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return;
+        dateKey = keyFor(date);
+      }
+      if (!totals[dateKey]) return;
+      const quantity = Number.parseFloat(String(record.quantity));
+      if (Number.isFinite(quantity) && quantity > 0) totals[dateKey][type] += quantity;
+    });
+    addTotals(getLocalRecords('requests'), 'requested', 'date');
+    addTotals(getLocalRecords('issuances'), 'issued', 'date');
+    addTotals(getLocalRecords('receipts'), 'received', 'receivedDate');
+
+    return {
+      selectedItem,
+      labels: days.map(date => new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' }).format(date)),
+      requested: days.map(date => totals[keyFor(date)].requested),
+      issued: days.map(date => totals[keyFor(date)].issued),
+      received: days.map(date => totals[keyFor(date)].received),
+      totalRequested: days.reduce((sum, date) => sum + totals[keyFor(date)].requested, 0),
+      totalIssued: days.reduce((sum, date) => sum + totals[keyFor(date)].issued, 0),
+      totalReceived: days.reduce((sum, date) => sum + totals[keyFor(date)].received, 0)
+    };
+  }
+
+  function getDemandStatuses(items) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - 29);
+    const counts = new Map(items.map(item => [item.id, 0]));
+    getLocalRecords('requests').forEach(request => {
+      if (!counts.has(request.itemId)) return;
+      const value = request.date || request.createdAt;
+      if (!value) return;
+      const dateParts = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      const requestDate = dateParts
+        ? new Date(Number(dateParts[1]), Number(dateParts[2]) - 1, Number(dateParts[3]))
+        : new Date(value);
+      if (Number.isNaN(requestDate.getTime())) return;
+      requestDate.setHours(0, 0, 0, 0);
+      if (requestDate < startDate || requestDate > today) return;
+      counts.set(request.itemId, counts.get(request.itemId) + 1);
+    });
+
+    return counts;
+  }
+
+  function refreshDemandStatuses() {
+    const items = getLocalRecords('items');
+    const counts = getDemandStatuses(items);
+    const highestCount = Math.max(0, ...counts.values());
+    items.forEach(item => {
+      const count = counts.get(item.id) || 0;
+      const row = [...table.rows].find(candidate => candidate.dataset.itemId === item.id);
+      const cell = row?.cells[6];
+      if (!cell) return;
+
+      const label = count === 0
+        ? 'No recent demand'
+        : count === highestCount
+          ? 'High demand'
+          : 'Some demand';
+      const badgeClass = count === 0
+        ? 'badge rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600'
+        : count === highestCount
+          ? 'badge rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-800'
+          : 'badge rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700';
+      const requestText = `${count} ${count === 1 ? 'request' : 'requests'}`;
+      const badge = createElement('span', badgeClass, `${label} · ${requestText}`);
+      badge.setAttribute('aria-label', `${item.name}: ${label}, ${requestText} in the last 30 days`);
+      cell.replaceChildren(badge);
+    });
+
+    if (!demandSummary) return;
+    if (highestCount === 0) {
+      demandSummary.textContent = 'No inventory items had requests in the last 30 days.';
+      return;
+    }
+    const highestDemandItems = items
+      .filter(item => counts.get(item.id) === highestCount)
+      .map(item => `${item.name} (${item.id})`);
+    demandSummary.textContent = `High demand: ${highestDemandItems.join(', ')} · ${highestCount} ${highestCount === 1 ? 'request' : 'requests'} each`;
+  }
+
+  function refreshMovementChart() {
+    if (!movementItemFilter) return;
+    const items = getLocalRecords('items');
+    const previousValue = movementItemFilter.value;
+    movementItemFilter.replaceChildren();
+    items.forEach(item => {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = `${item.name} (${item.id})`;
+      movementItemFilter.append(option);
+    });
+    if (items.length) {
+      movementItemFilter.value = items.some(item => item.id === previousValue)
+        ? previousValue
+        : items[0].id;
+      movementItemFilter.disabled = false;
+    } else {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'No inventory items';
+      movementItemFilter.append(option);
+      movementItemFilter.disabled = true;
+    }
+
+    const data = getMovementData(items, movementItemFilter.value);
+    const unit = data.selectedItem?.unit ? ` ${data.selectedItem.unit}` : '';
+    if (movementDescription) {
+      movementDescription.textContent = data.selectedItem
+        ? `${data.selectedItem.name} · requested, issued, and received quantities over the last 30 days`
+        : 'No inventory items are available to analyze.';
+    }
+    if (requestedTotal) requestedTotal.textContent = `${data.totalRequested.toLocaleString()}${unit}`;
+    if (issuedTotal) issuedTotal.textContent = `${data.totalIssued.toLocaleString()}${unit}`;
+    if (receivedTotal) receivedTotal.textContent = `${data.totalReceived.toLocaleString()}${unit}`;
+    if (!movementCanvas) return;
+
+    if (!window.Chart) {
+      if (!chartUnavailableMessageShown) {
+        const message = createElement('p', 'text-sm text-cbsua-muted', 'Movement trend chart is unavailable offline.');
+        movementCanvas.replaceWith(message);
+        chartUnavailableMessageShown = true;
+      }
+      return;
+    }
+
+    if (!movementChart) {
+      movementChart = new Chart(movementCanvas, {
+        type: 'line',
+        data: {
+          labels: data.labels,
+          datasets: [
+            {
+              label: 'Requested (demand)',
+              data: data.requested,
+              borderColor: '#d97706',
+              backgroundColor: '#d97706',
+              tension: 0.25,
+              pointRadius: 2
+            },
+            {
+              label: 'Issued (fulfilled)',
+              data: data.issued,
+              borderColor: '#166534',
+              backgroundColor: '#166534',
+              tension: 0.25,
+              pointRadius: 2
+            },
+            {
+              label: 'Received (supply)',
+              data: data.received,
+              borderColor: '#2563eb',
+              backgroundColor: '#2563eb',
+              tension: 0.25,
+              pointRadius: 2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: { tooltip: { mode: 'index', intersect: false } },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: data.selectedItem?.unit ? `Quantity (${data.selectedItem.unit})` : 'Quantity'
+              },
+              grid: { display: false }
+            },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+      return;
+    }
+
+    movementChart.data.labels = data.labels;
+    movementChart.data.datasets[0].data = data.requested;
+    movementChart.data.datasets[1].data = data.issued;
+    movementChart.data.datasets[2].data = data.received;
+    movementChart.options.scales.y.title.text = data.selectedItem?.unit
+      ? `Quantity (${data.selectedItem.unit})`
+      : 'Quantity';
+    movementChart.update();
+  }
+
+  movementItemFilter?.addEventListener('change', refreshMovementChart);
+
   function refreshSuppliers() {
     if (supplierSelect) {
       const previousValue = supplierSelect.value;
@@ -211,6 +432,8 @@ window.IMS.pageFeatures.push(() => {
   selects.forEach(select => select.addEventListener('change', update));
   window.addEventListener('ims:records-updated', update);
   window.addEventListener('ims:records-updated', refreshSuppliers);
+  window.addEventListener('ims:records-updated', refreshMovementChart);
+  window.addEventListener('ims:records-updated', refreshDemandStatuses);
   filterButtons.forEach(button => button.addEventListener('click', () => {
     const label = button.textContent.split('·')[0].trim();
     statusFilter = label === 'All items' ? '' : label.toLowerCase();
@@ -278,4 +501,6 @@ window.IMS.pageFeatures.push(() => {
   });
   refreshSuppliers();
   update();
+  refreshMovementChart();
+  refreshDemandStatuses();
 });

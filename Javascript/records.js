@@ -325,6 +325,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     const statusCell = createElement('td', 'py-3');
     statusCell.append(createElement('span', statusClass, status));
     row.append(statusCell);
+    row.append(createElement('td', 'py-3', '—'));
     const actionCell = createElement('td', 'py-3');
     const editButton = createElement('button', 'text-cbsua-primary hover:underline', 'Inspect / Edit');
     editButton.type = 'button';

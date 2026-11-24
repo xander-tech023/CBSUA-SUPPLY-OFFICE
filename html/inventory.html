@@ -9,6 +9,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="../Javascript/react-loader.js"></script>
   <script src="../Javascript/script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="../CSS/style.css" />
   <script src="../Javascript/form-validation.js"></script>
   <script src="../Javascript/inventory.js"></script>
@@ -115,6 +116,27 @@
         </div>
       </div>
 
+      <section class="stat-card mb-6">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 class="text-lg font-semibold">Item demand and supply movement</h3>
+            <p id="inventoryMovementDescription" class="text-xs text-cbsua-muted">Requested, issued, and received quantities · last 30 days</p>
+            <p id="inventoryDemandSummary" class="mt-2 text-sm font-medium" aria-live="polite">Identifying high-demand items…</p>
+            <p class="mt-1 text-xs text-cbsua-muted">Demand labels use request frequency over the last 30 days. Ties for the highest count are all marked High demand.</p>
+          </div>
+          <label class="flex items-center gap-2 text-sm">
+            <span class="text-cbsua-muted">Item</span>
+            <select id="inventoryMovementItem" class="max-w-56 rounded-lg border border-cbsua-border bg-white px-3 py-2" aria-label="Select item for movement trend"></select>
+          </label>
+        </div>
+        <div class="mb-4 flex flex-wrap gap-4 text-sm">
+          <span>Requested <strong id="inventoryRequestedTotal" class="text-lg">0</strong></span>
+          <span>Issued <strong id="inventoryIssuedTotal" class="text-lg">0</strong></span>
+          <span>Received <strong id="inventoryReceivedTotal" class="text-lg">0</strong></span>
+        </div>
+        <canvas id="inventoryMovementChart" height="220"></canvas>
+      </section>
+
       <!-- Inventory Table -->
       <div class="stat-card">
         <p class="text-sm text-cbsua-muted mb-4">8 catalog records · Balances as of 18 October 2026</p>
@@ -128,6 +150,7 @@
                 <th class="pb-3 font-medium">Unit</th>
                 <th class="pb-3 font-medium">Supplier (Sample)</th>
                 <th class="pb-3 font-medium">Status</th>
+                <th class="pb-3 font-medium">Demand (30 days)</th>
                 <th class="pb-3 font-medium">Action</th>
               </tr>
             </thead>
@@ -142,6 +165,7 @@
                 <td class="py-3">reams</td>
                 <td class="py-3">Bicol Office Depot</td>
                 <td class="py-3"><span class="badge bg-amber-100 text-amber-700">Low stock</span></td>
+                <td class="py-3">—</td>
                 <td class="py-3"><a href="#" class="text-cbsua-primary hover:underline">Edit →</a></td>
               </tr>
               <tr class="border-b border-cbsua-border/50 hover:bg-gray-50">
@@ -154,6 +178,7 @@
                 <td class="py-3">reams</td>
                 <td class="py-3">Bicol Office Depot</td>
                 <td class="py-3"><span class="badge bg-green-100 text-green-700">In stock</span></td>
+                <td class="py-3">—</td>
                 <td class="py-3"><a href="#" class="text-cbsua-primary hover:underline">Edit →</a></td>
               </tr>
               <tr class="border-b border-cbsua-border/50 hover:bg-gray-50">
@@ -166,6 +191,7 @@
                 <td class="py-3">pieces</td>
                 <td class="py-3">Bicol Office Depot</td>
                 <td class="py-3"><span class="badge bg-green-100 text-green-700">In stock</span></td>
+                <td class="py-3">—</td>
                 <td class="py-3"><a href="#" class="text-cbsua-primary hover:underline">Edit →</a></td>
               </tr>
               <tr class="border-b border-cbsua-border/50 hover:bg-gray-50">
@@ -178,6 +204,7 @@
                 <td class="py-3">cartridges</td>
                 <td class="py-3">Sipocot Print Supply</td>
                 <td class="py-3"><span class="badge bg-amber-100 text-amber-700">Low expiring</span></td>
+                <td class="py-3">—</td>
                 <td class="py-3"><a href="#" class="text-cbsua-primary hover:underline">Edit →</a></td>
               </tr>
               <tr class="border-b border-cbsua-border/50 hover:bg-gray-50">
@@ -190,6 +217,7 @@
                 <td class="py-3">bottles</td>
                 <td class="py-3">Camarines Essentials</td>
                 <td class="py-3"><span class="badge bg-orange-100 text-orange-700">Expiring soon</span></td>
+                <td class="py-3">—</td>
                 <td class="py-3"><a href="#" class="text-cbsua-primary hover:underline">Edit →</a></td>
               </tr>
               <tr class="border-b border-cbsua-border/50 hover:bg-gray-50">
@@ -202,6 +230,7 @@
                 <td class="py-3">pieces</td>
                 <td class="py-3">Bicol Office Depot</td>
                 <td class="py-3"><span class="badge bg-red-100 text-red-700">Out of stock</span></td>
+                <td class="py-3">—</td>
                 <td class="py-3"><a href="#" class="text-cbsua-primary hover:underline">Edit →</a></td>
               </tr>
             </tbody>
