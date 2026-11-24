@@ -121,7 +121,7 @@ window.IMS = window.IMS || {};
         title: registration.position.trim(),
         office: registration.office,
         email: registration.email.trim().toLowerCase(),
-        role: registration.role
+        role: 'end-user'
       };
       writeRegisteredAccount(account);
       return { ok: true, account };
@@ -181,6 +181,9 @@ window.IMS = window.IMS || {};
       return { ok: true };
     },
     async approvePasswordReset(requestId) {
+      if (window.IMS.currentUser?.role !== 'admin') {
+        throw new Error('Only an administrator can approve password reset requests.');
+      }
       const requests = readPasswordResetRequests();
       const request = requests.find(entry => entry.id === requestId);
       if (!request || request.status !== 'Pending') throw new Error('This password reset request is no longer pending.');
@@ -191,6 +194,9 @@ window.IMS = window.IMS || {};
       return { ok: true, request };
     },
     async rejectPasswordReset(requestId) {
+      if (window.IMS.currentUser?.role !== 'admin') {
+        throw new Error('Only an administrator can reject password reset requests.');
+      }
       const requests = readPasswordResetRequests();
       const request = requests.find(entry => entry.id === requestId);
       if (!request || request.status !== 'Pending') throw new Error('This password reset request is no longer pending.');

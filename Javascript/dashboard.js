@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const notificationBadge = document.getElementById('notificationBadge');
   const notificationSummary = document.getElementById('notificationSummary');
   const notificationList = document.getElementById('notificationList');
+  let canManagePasswordResets = window.IMS.currentUser?.role === 'admin';
   const canvas = document.getElementById('stockChart');
   const chartDescription = canvas?.closest('.stat-card')?.querySelector('p.text-xs');
   const stats = [...document.querySelectorAll('main .stat-card')].slice(0, 4);
@@ -43,28 +44,36 @@ document.addEventListener('DOMContentLoaded', () => {
       const date = document.createElement('p');
       date.className = 'mt-1 text-xs text-cbsua-muted';
       date.textContent = new Date(request.requestedAt).toLocaleString();
-      const actions = document.createElement('div');
-      actions.className = 'mt-3 flex gap-2';
-      const rejectButton = document.createElement('button');
-      rejectButton.type = 'button';
-      rejectButton.className = 'rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50';
-      rejectButton.textContent = 'Reject';
-      rejectButton.addEventListener('click', () => {
-        window.IMS.accounts.rejectPasswordReset(request.id)
-          .then(() => window.IMS.showToast(`Password reset request for ${request.username} rejected.`))
-          .catch(error => window.IMS.showToast(error.message));
-      });
-      const approveButton = document.createElement('button');
-      approveButton.type = 'button';
-      approveButton.className = 'rounded-lg bg-cbsua-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700';
-      approveButton.textContent = 'Approve';
-      approveButton.addEventListener('click', () => {
-        window.IMS.accounts.approvePasswordReset(request.id)
-          .then(() => window.IMS.showToast(`Password reset request for ${request.username} approved.`))
-          .catch(error => window.IMS.showToast(error.message));
-      });
-      actions.append(rejectButton, approveButton);
-      item.append(title, account, date, actions);
+      item.append(title, account, date);
+      if (canManagePasswordResets) {
+        const actions = document.createElement('div');
+        actions.className = 'mt-3 flex gap-2';
+        const rejectButton = document.createElement('button');
+        rejectButton.type = 'button';
+        rejectButton.className = 'rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50';
+        rejectButton.textContent = 'Reject';
+        rejectButton.addEventListener('click', () => {
+          window.IMS.accounts.rejectPasswordReset(request.id)
+            .then(() => window.IMS.showToast(`Password reset request for ${request.username} rejected.`))
+            .catch(error => window.IMS.showToast(error.message));
+        });
+        const approveButton = document.createElement('button');
+        approveButton.type = 'button';
+        approveButton.className = 'rounded-lg bg-cbsua-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700';
+        approveButton.textContent = 'Approve';
+        approveButton.addEventListener('click', () => {
+          window.IMS.accounts.approvePasswordReset(request.id)
+            .then(() => window.IMS.showToast(`Password reset request for ${request.username} approved.`))
+            .catch(error => window.IMS.showToast(error.message));
+        });
+        actions.append(rejectButton, approveButton);
+        item.append(actions);
+      } else {
+        const note = document.createElement('p');
+        note.className = 'mt-2 text-xs text-cbsua-muted';
+        note.textContent = 'Awaiting administrator review.';
+        item.append(note);
+      }
       notificationList.append(item);
     });
   }
@@ -82,6 +91,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   window.addEventListener('ims:password-reset-updated', renderPasswordResetNotifications);
+  window.addEventListener('ims:current-user-ready', event => {
+    canManagePasswordResets = event.detail?.role === 'admin';
+    renderPasswordResetNotifications();
+  });
   renderPasswordResetNotifications();
 
   function makeCell(text) {

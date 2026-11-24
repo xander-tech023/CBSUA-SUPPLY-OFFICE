@@ -61,11 +61,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.replace(roleHome);
     return;
   }
-  if (currentPage === 'dashboard.html' && currentUser.role !== 'admin') {
+  if (currentPage === 'dashboard.html' && !['admin', 'staff'].includes(currentUser.role)) {
     window.location.replace(roleHome);
     return;
   }
   window.IMS.currentUser = currentUser;
+  window.dispatchEvent(new CustomEvent('ims:current-user-ready', { detail: currentUser }));
 
   const {
     getLocalRecords, saveRecord, updateRequestStatus, updateInventoryItem, updateSupplier, addInventoryRow,
@@ -273,7 +274,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       link.classList.toggle('active', isCurrent);
       if (isCurrent) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
-      if (page === 'dashboard.html') link.hidden = currentUser.role !== 'admin';
+      if (page === 'dashboard.html') link.hidden = !['admin', 'staff'].includes(currentUser.role);
       if (page === 'stock_request.html') {
         const count = link.querySelector('span');
         if (count) count.textContent = String(getLocalRecords('requests').filter(request => request.status === 'Pending').length);

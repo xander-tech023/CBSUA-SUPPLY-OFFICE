@@ -180,7 +180,6 @@ document.addEventListener('DOMContentLoaded', () => {
       office: document.getElementById('registerOffice').value,
       position: document.getElementById('registerPosition').value.trim(),
       email: document.getElementById('institutionalEmail').value.trim(),
-      role: document.getElementById('registerRole').value,
       acceptedTerms: document.getElementById('acceptTerms').checked,
       password: registrationPassword.value
     };
