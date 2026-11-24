@@ -22,6 +22,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const changePasswordUsername = document.getElementById('changePasswordUsername');
   const lastResetUsernameKey = 'cbsuaLastPasswordResetUsername';
 
+  const officeSelect = document.getElementById('registerOffice');
+  if (officeSelect) {
+    [...officeSelect.options].forEach(option => {
+      if (!option.value) return;
+      option.value = option.textContent.trim();
+      option.textContent = `${window.IMS.accounts.getOfficeId(option.value)} — ${option.value}`;
+    });
+  }
+
   function setChangePasswordMode(enabled, username) {
     loginForm?.classList.toggle('hidden', enabled);
     registrationForm?.classList.toggle('hidden', true);
