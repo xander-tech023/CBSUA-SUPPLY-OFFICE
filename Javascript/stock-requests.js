@@ -26,7 +26,11 @@ window.IMS.pageFeatures.push(() => {
   }
 
   formatOfficeOptions(office);
-  formatOfficeOptions(document.querySelector('#requestOffice'));
+  const requestOfficeInput = document.querySelector('#requestOffice');
+  if (requestOfficeInput) {
+    requestOfficeInput.value = 'Supply Office';
+    requestOfficeInput.readOnly = true;
+  }
 
   function refreshRequestForm() {
     if (itemSelect) {
@@ -90,7 +94,9 @@ window.IMS.pageFeatures.push(() => {
       return (!statusFilter || status === statusFilter)
         && (!searchTerm || searchableText.includes(searchTerm))
         && (!officeTerm || String(request.office || '').toLowerCase().includes(officeTerm));
-    });
+    }).sort((left, right) =>
+      new Date(right.createdAt || right.date || 0) - new Date(left.createdAt || left.date || 0)
+      || right.id.localeCompare(left.id, undefined, { numeric: true, sensitivity: 'base' }));
 
     adminCardSummary.textContent = `Showing ${visibleRequests.length} of ${records.length} requests`;
     adminCardList.replaceChildren();

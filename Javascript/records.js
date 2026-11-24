@@ -529,7 +529,8 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
         left.id.localeCompare(right.id, undefined, { numeric: true, sensitivity: 'base' }))
       : currentPage === 'stock_request.html'
         ? [...records].sort((left, right) =>
-          Number(left.id.match(/(\d+)$/)?.[1]) - Number(right.id.match(/(\d+)$/)?.[1]))
+          new Date(right.createdAt || right.date || 0) - new Date(left.createdAt || left.date || 0)
+          || right.id.localeCompare(left.id, undefined, { numeric: true, sensitivity: 'base' }))
         : records;
     recordsForDisplay.forEach(resource[1]);
     const filter = currentPage === 'inventory.html' ? document.querySelector('#searchInput')

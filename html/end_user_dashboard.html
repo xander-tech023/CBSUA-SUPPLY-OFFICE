@@ -172,7 +172,7 @@
           </div>
           <div>
             <label class="mb-2 block font-medium" for="requestEmployeeId">Employee ID</label>
-            <input id="requestEmployeeId" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" readonly />
+            <input id="requestEmployeeId" type="text" minlength="3" maxlength="24" pattern="[A-Za-z0-9\-]+" autocomplete="off" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" placeholder="Enter employee ID" required />
           </div>
         </div>
         <div>

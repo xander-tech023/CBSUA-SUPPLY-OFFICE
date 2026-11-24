@@ -267,6 +267,31 @@ window.IMS = window.IMS || {};
       writeRegisteredAccount(account);
       return { ok: true, account };
     },
+    async updateEmployeeId(username, employeeId) {
+      const normalizedUsername = String(username || '').trim().toLowerCase();
+      const normalizedEmployeeId = String(employeeId || '').trim().toUpperCase();
+      if (!/^[A-Z0-9-]{3,24}$/.test(normalizedEmployeeId)) {
+        throw new Error('Enter an employee ID using 3–24 letters, numbers, or hyphens.');
+      }
+      const registeredAccounts = readRegisteredAccounts();
+      const duplicate = [...registeredAccounts, ...Object.values(accounts)].some(account =>
+        account.username.toLowerCase() !== normalizedUsername
+        && String(account.employeeId || '').trim().toUpperCase() === normalizedEmployeeId
+      );
+      if (duplicate) throw new Error('That employee ID is already used by another account.');
+      const account = registeredAccounts.find(entry => entry.username.toLowerCase() === normalizedUsername);
+      if (!account) throw new Error('Only registered end-user accounts can update their employee ID here.');
+      account.employeeId = normalizedEmployeeId;
+      localStorage.setItem(registeredAccountsKey, JSON.stringify(registeredAccounts));
+      const session = readSession();
+      if (session?.username?.toLowerCase() === normalizedUsername) {
+        session.employeeId = normalizedEmployeeId;
+        sessionStorage.setItem(sessionKey, JSON.stringify(session));
+        if (localStorage.getItem(sessionKey)) localStorage.setItem(sessionKey, JSON.stringify(session));
+        window.IMS.currentUser = session;
+      }
+      return { ok: true, employeeId: normalizedEmployeeId };
+    },
     async requestPasswordReset(username) {
       const account = findAccount(username);
       if (!account) throw new Error('No account was found with that username.');

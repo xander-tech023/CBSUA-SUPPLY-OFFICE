@@ -320,7 +320,10 @@ window.IMS.pageFeatures.push(() => {
       if (officeIdField) officeIdField.textContent = officeId ? `Office ID: ${officeId}` : '';
     }
     if (recipientField) recipientField.value = user.name || '';
-    if (employeeIdField) employeeIdField.value = user.employeeId || '';
+    if (employeeIdField) {
+      employeeIdField.value = user.employeeId || '';
+      employeeIdField.readOnly = false;
+    }
   }
 
   itemSelect?.addEventListener('change', () => {

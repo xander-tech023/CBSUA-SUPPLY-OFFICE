@@ -747,6 +747,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!item || !Number.isSafeInteger(quantity) || quantity <= 0) {
           return showToast('Choose an item and enter a whole-number quantity greater than zero.');
         }
+        if (currentUser.role === 'admin') {
+          const requestOffice = form.querySelector('#requestOffice');
+          if (requestOffice) requestOffice.value = 'Supply Office';
+        }
         const request = {
           id: nextRequestId(),
           date: (() => {
@@ -754,6 +758,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
             return today.toISOString().slice(0, 10);
           })(),
+          createdAt: new Date().toISOString(),
           office: form.querySelector('#requestOffice').value,
           recipient: form.querySelector('#requestRecipient').value.trim(),
           employeeId: form.querySelector('#requestEmployeeId').value.trim().toUpperCase(),
@@ -766,6 +771,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
         if (!/^[A-Z0-9-]{3,24}$/.test(request.employeeId)) {
           return showToast('Enter an employee ID using 3–24 letters, numbers, or hyphens.');
+        }
+        if (currentUser.role === 'end-user') {
+          const updated = await window.IMS.accounts.updateEmployeeId(currentUser.username, request.employeeId);
+          if (!updated) return;
         }
         if (currentUser.role === 'end-user' && quantity > item.quantity) {
           return showToast(`Only ${item.quantity} ${item.unit} are currently available.`);
