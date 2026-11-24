@@ -36,32 +36,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderResetStatus() {
     const username = localStorage.getItem(lastResetUsernameKey);
-    if (!username) return;
+    registrationSuccess.classList.add('hidden');
+    if (!username) {
+      showResetPassword.textContent = 'Reset password';
+      return;
+    }
     const latestRequest = window.IMS.accounts.readPasswordResetRequests()
       .filter(request => request.username === username)
       .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt))[0];
-    if (!latestRequest) return;
-
-    registrationSuccess.classList.remove('hidden');
-    if (latestRequest.status === 'Approved') {
-      registrationSuccess.innerHTML = '';
-      const message = document.createElement('span');
-      message.textContent = 'Your password reset request was approved.';
-      const action = document.createElement('button');
-      action.type = 'button';
-      action.className = 'ml-2 rounded-lg bg-cbsua-primary px-3 py-1 text-sm font-medium text-white hover:bg-green-700';
-      action.textContent = 'Change password';
-      action.addEventListener('click', () => setChangePasswordMode(true, username));
-      registrationSuccess.append(message, action);
-    } else if (latestRequest.status === 'Rejected') {
-      registrationSuccess.className = 'text-red-700 text-sm mt-3 text-center';
-      registrationSuccess.textContent = 'Your password reset request was rejected.';
-    } else if (latestRequest.status === 'Pending') {
-      registrationSuccess.className = 'text-cbsua-muted text-sm mt-3 text-center';
-      registrationSuccess.textContent = 'Your password reset request is pending administrator review.';
-    } else {
-      registrationSuccess.classList.add('hidden');
+    if (!latestRequest) {
+      showResetPassword.textContent = 'Reset password';
+      return;
     }
+
+    if (latestRequest.status === 'Approved') {
+      showResetPassword.textContent = 'Change password';
+      return;
+    }
+    showResetPassword.textContent = 'Reset password';
   }
 
   function setResetPasswordMode(requesting) {
@@ -73,7 +65,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (requesting) document.getElementById('resetUsername')?.focus();
   }
 
-  showResetPassword?.addEventListener('click', () => setResetPasswordMode(true));
+  showResetPassword?.addEventListener('click', () => {
+    const username = localStorage.getItem(lastResetUsernameKey);
+    const approved = username && window.IMS.accounts.readPasswordResetRequests().some(request =>
+      request.username === username && request.status === 'Approved'
+    );
+    if (approved) setChangePasswordMode(true, username);
+    else setResetPasswordMode(true);
+  });
   cancelResetPassword?.addEventListener('click', () => setResetPasswordMode(false));
 
   resetPasswordRequestForm?.addEventListener('submit', event => {
