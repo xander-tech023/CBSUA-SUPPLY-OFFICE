@@ -111,6 +111,16 @@
     </main>
   </div>
 
+  <div id="officeActivityModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="officeActivityTitle">
+    <div class="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div class="mb-5 flex items-center justify-between gap-4">
+        <h3 id="officeActivityTitle" class="text-xl font-bold">Office recent activity</h3>
+        <button type="button" data-close-office-activity class="text-cbsua-muted hover:text-black" aria-label="Close office activity">✕</button>
+      </div>
+      <div id="officeActivityContent" class="text-sm"></div>
+    </div>
+  </div>
+
   <script>
     const officesMenuButton = document.createElement("button");
     officesMenuButton.type = "button";
@@ -172,6 +182,109 @@
     const filter = document.getElementById("officeFilter");
     const results = document.getElementById("officeResults");
     const clear = document.getElementById("clearFilters");
+    const activityModal = document.getElementById("officeActivityModal");
+    const activityTitle = document.getElementById("officeActivityTitle");
+    const activityContent = document.getElementById("officeActivityContent");
+    const officeAliases = {
+      "Registrar's Office": ["Registrar"],
+      "Clinic / Infirmary": ["Campus Health Services", "Clinic"]
+    };
+    let recordsPromise;
+    let activityOpener;
+
+    function createActivityElement(tag, className = "", text = "") {
+      const element = document.createElement(tag);
+      element.className = className;
+      element.textContent = text;
+      return element;
+    }
+
+    function closeOfficeActivity() {
+      activityModal.classList.add("hidden");
+      activityModal.classList.remove("flex");
+      activityOpener?.focus();
+    }
+
+    async function showOfficeActivity(office, opener) {
+      activityOpener = opener;
+      activityTitle.textContent = `${office} — Recent activity`;
+      activityContent.replaceChildren(createActivityElement("p", "text-cbsua-muted", "Loading office activity…"));
+      activityModal.classList.remove("hidden");
+      activityModal.classList.add("flex");
+      activityModal.querySelector("[data-close-office-activity]").focus();
+
+      try {
+        if (!recordsPromise) recordsPromise = window.IMS.initializeRecords();
+        await recordsPromise;
+
+        const items = window.IMS.getLocalRecords("items");
+        const requests = window.IMS.getLocalRecords("requests")
+          .filter(request => request.office === office || officeAliases[office]?.includes(request.office))
+          .map(request => ({
+            id: request.id,
+            date: request.date || request.createdAt,
+            type: "Requested",
+            item: items.find(item => item.id === request.itemId),
+            itemFallback: request.item || request.itemId,
+            quantity: request.quantity,
+            status: request.status || "Pending",
+            recipient: request.recipient
+          }));
+        const issuances = window.IMS.getLocalRecords("issuances")
+          .filter(issuance => issuance.office === office || officeAliases[office]?.includes(issuance.office))
+          .map(issuance => ({
+            id: issuance.id,
+            date: issuance.date || issuance.createdAt,
+            type: "Issued",
+            item: items.find(item => item.id === issuance.itemId),
+            itemFallback: issuance.itemName || issuance.itemId,
+            quantity: [issuance.quantity, issuance.unit].filter(Boolean).join(" "),
+            status: "Issued",
+            recipient: issuance.recipient
+          }));
+        const activity = [...requests, ...issuances]
+          .sort((left, right) => (Date.parse(right.date) || 0) - (Date.parse(left.date) || 0));
+
+        activityContent.replaceChildren();
+        if (!activity.length) {
+          activityContent.append(createActivityElement("p", "py-6 text-center text-cbsua-muted",
+            "No requests or stock transactions are recorded for this office yet."));
+          return;
+        }
+
+        const tableWrapper = createActivityElement("div", "overflow-x-auto");
+        const table = createActivityElement("table", "w-full min-w-[700px] text-left");
+        const header = document.createElement("thead");
+        const headerRow = createActivityElement("tr", "border-b border-cbsua-border text-cbsua-muted");
+        ["Date", "Activity", "Requested stock", "Quantity", "Status", "Employee"].forEach(label => {
+          headerRow.append(createActivityElement("th", "px-3 py-2 font-medium", label));
+        });
+        header.append(headerRow);
+        const body = document.createElement("tbody");
+        activity.slice(0, 10).forEach(entry => {
+          const row = createActivityElement("tr", "border-b border-cbsua-border/50");
+          const date = entry.date && !Number.isNaN(Date.parse(entry.date))
+            ? new Date(entry.date).toLocaleDateString()
+            : "—";
+          const stock = entry.item
+            ? `${entry.item.id} — ${entry.item.name}`
+            : entry.itemFallback || "—";
+          [date, `${entry.type} · ${entry.id}`, stock, entry.quantity || "—", entry.status, entry.recipient || "—"]
+            .forEach(value => row.append(createActivityElement("td", "px-3 py-3 align-top", value)));
+          body.append(row);
+        });
+        table.append(header, body);
+        tableWrapper.append(table);
+        activityContent.append(
+          createActivityElement("p", "mb-3 text-cbsua-muted", `Showing the ${Math.min(activity.length, 10)} most recent request and issuance records.`),
+          tableWrapper
+        );
+      } catch (error) {
+        console.error("Office activity could not be loaded.", error);
+        activityContent.replaceChildren(createActivityElement("p", "py-6 text-center text-red-700",
+          "Office activity could not be loaded. Please close this window and try again."));
+      }
+    }
 
     function renderOffices() {
       const query = search.value.trim().toLowerCase();
@@ -189,13 +302,15 @@
             <div class="flex items-start gap-3">
               <div class="shrink-0 w-11 h-11 rounded-lg bg-cbsua-light text-cbsua-primary flex items-center justify-center font-bold">${initials || "O"}</div>
               <div class="min-w-0 flex-1">
-                <h3 class="font-semibold leading-snug">${name}</h3>
+                <h3 class="font-semibold leading-snug">
+                  <button type="button" class="office-details text-left hover:text-cbsua-primary" data-office="${name}" aria-label="View recent activity for ${name}">${name}</button>
+                </h3>
                 <span class="inline-block mt-2 text-xs px-2 py-1 rounded-full bg-gray-100 text-cbsua-muted">${label}</span>
               </div>
               <span class="text-xs text-cbsua-muted whitespace-nowrap">Active</span>
             </div>
-            <div class="mt-4 pt-3 border-t border-cbsua-border flex items-center justify-between text-sm">
-              <span class="text-cbsua-muted">No pending request</span>
+            <div class="mt-4 pt-3 border-t border-cbsua-border flex items-center justify-between gap-3 text-sm">
+              <button type="button" class="office-details text-cbsua-primary font-medium hover:underline" data-office="${name}">Recent activity →</button>
               <button type="button" class="office-request text-cbsua-primary font-medium hover:underline" data-office="${name}">Request supply →</button>
             </div>
           </article>`;
@@ -218,7 +333,20 @@
     });
     grid.addEventListener("click", event => {
       const button = event.target.closest(".office-request");
-      if (button) window.location.href = `stock_request.html?office=${encodeURIComponent(button.dataset.office)}`;
+      if (button) {
+        window.location.href = `stock_request.html?office=${encodeURIComponent(button.dataset.office)}`;
+        return;
+      }
+      const detailsButton = event.target.closest(".office-details");
+      if (detailsButton) showOfficeActivity(detailsButton.dataset.office, detailsButton);
+    });
+
+    activityModal.querySelector("[data-close-office-activity]").addEventListener("click", closeOfficeActivity);
+    activityModal.addEventListener("click", event => {
+      if (event.target === activityModal) closeOfficeActivity();
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !activityModal.classList.contains("hidden")) closeOfficeActivity();
     });
 
     renderOffices();

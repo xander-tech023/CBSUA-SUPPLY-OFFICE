@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const togglePass = document.getElementById('togglePass');
   const passInput = document.getElementById('password');
   const loginForm = document.getElementById('loginForm');
   const errorMessage = document.getElementById('loginErr');
@@ -17,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     registrationForm?.classList.toggle('hidden', !registering);
     showRegistration?.classList.toggle('hidden', registering);
     loginHeading?.classList.toggle('hidden', registering);
-    if (registering) document.getElementById('fullName')?.focus();
+    if (registering) document.getElementById('firstName')?.focus();
   }
 
   showRegistration?.addEventListener('click', () => setAccountMode(true));
@@ -47,10 +46,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const registration = {
-      fullName: document.getElementById('fullName').value.trim(),
+      firstName: document.getElementById('firstName').value.trim(),
+      middleName: document.getElementById('middleName').value.trim(),
+      surname: document.getElementById('surname').value.trim(),
       username: document.getElementById('registerUsername').value.trim(),
       office: document.getElementById('registerOffice').value,
+      position: document.getElementById('registerPosition').value.trim(),
+      email: document.getElementById('institutionalEmail').value.trim(),
       role: document.getElementById('registerRole').value,
+      acceptedTerms: document.getElementById('acceptTerms').checked,
       password: registrationPassword.value
     };
 
@@ -65,12 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
         registrationErr.textContent = error.message || 'The account could not be created.';
         registrationErr.classList.remove('hidden');
       });
-  });
-
-  togglePass?.addEventListener('click', () => {
-    const showing = passInput.type === 'password';
-    passInput.type = showing ? 'text' : 'password';
-    togglePass.setAttribute('aria-label', showing ? 'Hide password' : 'Show password');
   });
 
   loginForm?.addEventListener('submit', event => {

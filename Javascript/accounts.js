@@ -72,13 +72,17 @@ window.IMS = window.IMS || {};
       return { ok: true, user };
     },
     async register(registration) {
+      if (!registration.acceptedTerms) {
+        throw new Error('You must accept the Terms and Conditions to create an account.');
+      }
       const account = {
         id: Date.now(),
         username: registration.username.trim().toLowerCase(),
         password: registration.password,
-        name: registration.fullName.trim(),
-        title: `${registration.office} account`,
+        name: [registration.firstName, registration.middleName, registration.surname].filter(Boolean).join(' '),
+        title: registration.position.trim(),
         office: registration.office,
+        email: registration.email.trim().toLowerCase(),
         role: registration.role
       };
       writeRegisteredAccount(account);

@@ -83,6 +83,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         requestForm.querySelector('#requestDate').value = today.toISOString().slice(0, 10);
       }
     }
+    if (pageModal.id === 'addItemModal' && !pageModal.querySelector('#addItemForm').dataset.editingItem) {
+      const itemIdField = pageModal.querySelector('#itemInventoryId');
+      itemIdField.value = nextRecordId('items', 'ITM-', 8);
+      itemIdField.readOnly = true;
+    }
     if (pageModal.id === 'supplierModal' && !pageModal.querySelector('#supplierForm').dataset.editingSupplier) {
       pageModal.querySelector('#supplierForm input').value = nextRecordId('suppliers', 'SUP-', 3);
     }
@@ -107,7 +112,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     delete form.dataset.editingItem;
     delete form.dataset.editingSupplier;
     const idField = form.querySelector('input');
-    if (idField) idField.readOnly = form.id === 'supplierForm';
+    if (idField) idField.readOnly = form.id === 'supplierForm' || form.id === 'addItemForm';
     const heading = form.closest('.fixed')?.querySelector('h3');
     if (heading) {
       heading.textContent = form.id === 'addItemForm'
@@ -712,7 +717,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         addInventoryRow(savedItem);
         document.querySelector('#searchInput')?.dispatchEvent(new Event('input', { bubbles: true }));
         form.reset();
-        fields[0].readOnly = false;
+        fields[0].readOnly = true;
         fields[7].readOnly = false;
         fields[7].previousElementSibling.textContent = 'Opening quantity *';
         delete form.dataset.editingItem;
