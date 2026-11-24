@@ -122,7 +122,7 @@ body {
 @media print {
   @page {
     size: A4;
-    margin: 18mm;
+    margin: 10mm;
   }
 
   html,
@@ -143,9 +143,21 @@ body {
     inset: 0;
     width: 100%;
     padding: 0;
+    box-sizing: border-box;
     background: #fff !important;
     color: #111827 !important;
     font: 10pt/1.45 Arial, sans-serif;
+  }
+
+  .ims-print-document:not(.ims-print-ris-document) {
+    padding: 8mm;
+  }
+
+  .ims-print-ris-document {
+    display: flex !important;
+    flex-direction: column;
+    min-height: 277mm;
+    font: 8pt/1.25 Arial, sans-serif;
   }
 
   .ims-print-masthead {
@@ -178,10 +190,73 @@ body {
     letter-spacing: 0.08em;
   }
 
+  .ims-print-ris-masthead {
+    display: grid;
+    grid-template-columns: 16mm 18mm minmax(0, 1fr) 21mm;
+    align-items: center;
+    gap: 1mm;
+    padding-bottom: 2mm;
+    border-bottom: 1px solid #111;
+    text-align: center;
+  }
+
+  .ims-print-ris-masthead img {
+    width: auto;
+    height: auto;
+    margin: auto;
+  }
+
+  .ims-print-ris-masthead .ims-print-ris-seal {
+    width: 15mm;
+    height: 15mm;
+  }
+
+  .ims-print-ris-masthead .ims-print-ris-bagong-logo {
+    width: 17mm;
+    height: 16mm;
+    -webkit-mask-image: url("../Image/ris-bagong-pilipinas-mask.png");
+    mask-image: url("../Image/ris-bagong-pilipinas-mask.png");
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+  }
+
+  .ims-print-ris-masthead .ims-print-ris-certification-logo {
+    width: 21mm;
+    height: 11mm;
+  }
+
+  .ims-print-ris-school p {
+    margin: 0;
+    font-size: 5.5pt;
+    line-height: 1.2;
+  }
+
+  .ims-print-ris-school .ims-print-university {
+    font-size: 6.4pt;
+    font-weight: 700;
+  }
+
   .ims-print-title {
     margin: 1.5rem 0;
     text-align: center;
     font-size: 15pt;
+    font-weight: 700;
+  }
+
+  .ims-print-ris-title {
+    margin: 7mm 0 0;
+    font-size: 11pt;
+    line-height: 1.15;
+  }
+
+  .ims-print-ris-subtitle {
+    margin: 1mm 0 4mm;
+    text-align: center;
+    font-size: 8pt;
     font-weight: 700;
   }
 
@@ -204,6 +279,31 @@ body {
     margin: 0;
   }
 
+  .ims-print-ris-metadata {
+    grid-template-columns: minmax(0, 1fr) 48mm;
+    gap: 1.5mm 5mm;
+    margin: 0 6mm;
+    font-size: 7pt;
+    line-height: 1.25;
+  }
+
+  .ims-print-ris-metadata-row {
+    align-items: baseline;
+    gap: 1mm;
+  }
+
+  .ims-print-ris-metadata-row dt {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-weight: 400;
+  }
+
+  .ims-print-ris-metadata-row dd {
+    min-width: 0;
+    flex: 1;
+    border-bottom: 0.5px solid #111;
+  }
+
   .ims-print-items {
     width: 100%;
     margin-top: 1.5rem;
@@ -221,8 +321,92 @@ body {
     background: #f3f4f6 !important;
   }
 
+  .ims-print-ris-table {
+    table-layout: fixed;
+    margin-top: 4mm;
+    border: 1px solid #111;
+    font-size: 6.5pt;
+    line-height: 1.15;
+  }
+
+  .ims-print-ris-table th,
+  .ims-print-ris-table td {
+    height: 5mm;
+    padding: 1mm;
+    border: 1px solid #111;
+    text-align: center;
+    overflow-wrap: anywhere;
+    vertical-align: middle;
+  }
+
+  .ims-print-ris-table th {
+    background: #ddd !important;
+    font-weight: 700;
+  }
+
+  .ims-print-ris-table td:nth-child(3),
+  .ims-print-ris-table td:nth-child(8) {
+    text-align: left;
+  }
+
+  .ims-print-ris-table td:nth-child(3) {
+    padding-left: 1.5mm;
+  }
+
   .ims-print-note {
     margin-top: 1.5rem;
+  }
+
+  .ims-print-purpose {
+    margin: 3mm 6mm 0;
+  }
+
+  .ims-print-purpose-label {
+    font-weight: 700;
+  }
+
+  .ims-print-ris-signatures {
+    row-gap: 4mm;
+    column-gap: 12mm;
+    margin: 6mm 6mm 0;
+    text-align: left;
+  }
+
+  .ims-print-ris-signature {
+    min-height: 22mm;
+    break-inside: avoid;
+  }
+
+  .ims-print-ris-signature .ims-print-signature-label {
+    margin: 0 0 3mm;
+    font-size: 7pt;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .ims-print-ris-signature .ims-print-signature-name {
+    margin: 0 0 1mm;
+    padding: 0;
+    border: 0;
+    font-size: 7pt;
+    font-weight: 400;
+  }
+
+  .ims-print-ris-signature .ims-print-signature-caption {
+    margin: 0 0 1mm 8mm;
+    font-size: 6.5pt;
+  }
+
+  .ims-print-ris-signature .ims-print-signature-date {
+    margin: 0;
+    font-size: 7pt;
+  }
+
+  .ims-print-page-number {
+    margin: auto 0 0;
+    padding-top: 3mm;
+    text-align: right;
+    font-size: 6pt;
   }
 
   .ims-print-signatures {
@@ -233,15 +417,21 @@ body {
     text-align: center;
   }
 
+  .ims-print-signatures-ris {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .ims-print-signature-name {
     margin-top: 3rem;
     padding-top: 0.4rem;
     border-top: 1px solid #111827;
     font-weight: 700;
+    overflow-wrap: anywhere;
   }
 
   .ims-print-signature-label,
-  .ims-print-signature-caption {
+  .ims-print-signature-caption,
+  .ims-print-signature-date {
     margin: 0;
     font-size: 9pt;
   }
