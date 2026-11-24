@@ -5,6 +5,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const stats = [...document.querySelectorAll('main .stat-card')].slice(0, 4);
   const transactionBody = document.querySelector('#transactions tbody');
   const attentionList = document.querySelector('main .grid.grid-cols-1.lg\\:grid-cols-3 > .stat-card:last-child .space-y-3');
+  const notificationToggle = document.getElementById('notificationToggle');
+  const notificationPanel = document.getElementById('notificationPanel');
+  const notificationBadge = document.getElementById('notificationBadge');
+  const notificationSummary = document.getElementById('notificationSummary');
+  const notificationList = document.getElementById('notificationList');
   let chart = null;
 
   function makeCell(text) {
@@ -13,6 +18,109 @@ document.addEventListener('DOMContentLoaded', () => {
     cell.textContent = text;
     return cell;
   }
+
+  function renderNotifications(requests, items) {
+    if (!notificationList) return;
+    const notifications = requests
+      .filter(request => request.status === 'Pending')
+      .map(request => ({
+        title: `Approval needed · ${request.id}`,
+        details: `${request.office || 'Office'} · ${request.recipient || 'End user'} requested ${request.quantity} of ${request.item}.`,
+        note: request.remarks ? `End-user note: ${request.remarks}` : '',
+        href: 'stock_request.html'
+      }));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    items.forEach(item => {
+      const quantity = Number(item.quantity);
+      const minimum = Number(item.minimum);
+      if (Number.isFinite(quantity) && Number.isFinite(minimum) && quantity <= minimum) {
+        notifications.push({
+          title: quantity <= 0 ? `Out of stock · ${item.name}` : `Low stock · ${item.name}`,
+          details: `${quantity} ${item.unit} available; minimum is ${minimum} ${item.unit}.`,
+          note: '',
+          href: 'inventory.html'
+        });
+      }
+
+      const expiryDate = item.expiry ? new Date(`${item.expiry}T00:00:00`) : null;
+      const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate - today) / 86400000) : null;
+      const isExpiring = expiryDate
+        ? daysUntilExpiry >= 0 && daysUntilExpiry <= 45
+        : item.status?.toLowerCase().includes('expiring');
+      if (isExpiring) {
+        notifications.push({
+          title: `Expiring item · ${item.name}`,
+          details: item.expiry ? `Expires ${item.expiry}.` : item.status,
+          note: '',
+          href: 'inventory.html'
+        });
+      }
+    });
+
+    notificationList.replaceChildren();
+    if (!notifications.length) {
+      const emptyState = document.createElement('p');
+      emptyState.className = 'px-4 py-6 text-center text-sm text-cbsua-muted';
+      emptyState.textContent = 'You are all caught up.';
+      notificationList.append(emptyState);
+    } else {
+      notifications.forEach(notification => {
+        const link = document.createElement('a');
+        link.href = notification.href;
+        link.className = 'block border-b border-cbsua-border px-4 py-3 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700';
+        const title = document.createElement('p');
+        title.className = 'text-sm font-medium';
+        title.textContent = notification.title;
+        const details = document.createElement('p');
+        details.className = 'mt-1 text-xs text-cbsua-muted';
+        details.textContent = notification.details;
+        link.append(title, details);
+        if (notification.note) {
+          const note = document.createElement('p');
+          note.className = 'mt-1 text-xs text-cbsua-muted';
+          note.textContent = notification.note;
+          link.append(note);
+        }
+        notificationList.append(link);
+      });
+    }
+
+    const count = notifications.length;
+    if (notificationBadge) {
+      notificationBadge.textContent = count > 99 ? '99+' : String(count);
+      notificationBadge.classList.toggle('hidden', count === 0);
+    }
+    if (notificationSummary) {
+      notificationSummary.textContent = `${count} active ${count === 1 ? 'notification' : 'notifications'}`;
+    }
+    notificationToggle?.setAttribute('aria-label', `Notifications, ${count} active ${count === 1 ? 'notification' : 'notifications'}`);
+  }
+
+  function setNotificationOpen(isOpen) {
+    if (!notificationToggle || !notificationPanel) return;
+    notificationPanel.classList.toggle('hidden', !isOpen);
+    notificationToggle.setAttribute('aria-expanded', String(isOpen));
+  }
+
+  notificationToggle?.addEventListener('click', () => {
+    setNotificationOpen(notificationPanel?.classList.contains('hidden'));
+  });
+  document.addEventListener('click', event => {
+    if (!notificationPanel?.contains(event.target) && !notificationToggle?.contains(event.target)) {
+      setNotificationOpen(false);
+    }
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') setNotificationOpen(false);
+  });
+  window.addEventListener('storage', event => {
+    if (event.key !== 'cbsuaSupplyRecords') return;
+    window.IMS.initializeRecords()
+      .then(() => window.dispatchEvent(new CustomEvent('ims:records-updated')))
+      .catch(error => console.error('Dashboard notifications could not be refreshed.', error));
+  });
 
   function getMovementData() {
     const receipts = getLocalRecords('receipts');
@@ -56,6 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const items = getLocalRecords('items');
     const requests = getLocalRecords('requests');
     const pending = requests.filter(request => request.status === 'Pending').length;
+    renderNotifications(requests, items);
     const lowStock = items.filter(item => item.quantity <= item.minimum).length;
     const expiring = items.filter(item => {
       if (!item.expiry) return item.status?.toLowerCase().includes('expiring');

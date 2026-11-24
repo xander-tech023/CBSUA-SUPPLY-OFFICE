@@ -72,6 +72,19 @@
           <p class="text-cbsua-muted text-sm">Monitor campus stock, attend to requests, and keep every movement accountable.</p>
         </div>
         <div class="flex items-center gap-4">
+          <div class="relative">
+            <button type="button" class="relative p-2 border border-cbsua-border rounded-lg hover:bg-gray-50" id="notificationToggle" aria-label="Notifications" aria-controls="notificationPanel" aria-expanded="false">
+              <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span id="notificationBadge" class="hidden absolute -right-1 -top-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-xs font-semibold flex items-center justify-center" aria-hidden="true">0</span>
+            </button>
+            <section id="notificationPanel" class="hidden absolute right-0 top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-cbsua-border bg-white shadow-xl" aria-labelledby="notificationHeading">
+              <div class="flex items-center justify-between border-b border-cbsua-border px-4 py-3">
+                <h3 id="notificationHeading" class="font-semibold">Notifications</h3>
+                <span id="notificationSummary" class="text-xs text-cbsua-muted">No active alerts</span>
+              </div>
+              <div id="notificationList" class="max-h-96 overflow-y-auto" aria-live="polite"></div>
+            </section>
+          </div>
           <button class="p-2 border border-cbsua-border rounded-lg hover:bg-gray-50" id="themeToggle"><svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M20 14.5A7.5 7.5 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-full bg-cbsua-primary text-white flex items-center justify-center text-sm font-semibold">
