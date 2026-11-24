@@ -3,6 +3,8 @@ window.IMS = window.IMS || {};
 (() => {
   const sessionKey = 'cbsuaSupplySession';
   const registeredAccountsKey = 'cbsuaSupplyAccounts';
+  const passwordOverridesKey = 'cbsuaSupplyPasswordOverrides';
+  const passwordResetRequestsKey = 'cbsuaSupplyPasswordResetRequests';
   const accounts = {
     admin: {
       id: 1,
@@ -38,6 +40,39 @@ window.IMS = window.IMS || {};
     }
   }
 
+  function readPasswordOverrides() {
+    try {
+      return JSON.parse(localStorage.getItem(passwordOverridesKey) || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  function readPasswordResetRequests() {
+    try {
+      return JSON.parse(localStorage.getItem(passwordResetRequestsKey) || '[]');
+    } catch {
+      return [];
+    }
+  }
+
+  function writePasswordResetRequests(requests) {
+    localStorage.setItem(passwordResetRequestsKey, JSON.stringify(requests));
+  }
+
+  function getAllAccounts() {
+    const overrides = readPasswordOverrides();
+    return [...Object.values(accounts).map(account => ({
+      ...account,
+      password: overrides[account.username.toLowerCase()] || account.password
+    })), ...readRegisteredAccounts()];
+  }
+
+  function findAccount(username) {
+    const normalized = String(username || '').trim().toLowerCase();
+    return getAllAccounts().find(account => account.username.toLowerCase() === normalized) || null;
+  }
+
   function writeRegisteredAccount(account) {
     const registeredAccounts = readRegisteredAccounts();
     const duplicate = [...registeredAccounts, ...Object.values(accounts)].some(
@@ -50,10 +85,10 @@ window.IMS = window.IMS || {};
 
   window.IMS.accounts = {
     async login(role, username, password, remember) {
-      const account = [...Object.values(accounts), ...readRegisteredAccounts()].find(
+      const account = getAllAccounts().find(
         candidate => candidate.username.toLowerCase() === username.toLowerCase()
       );
-      if (!account || account.username !== username || account.password !== password) {
+      if (!account || account.username.toLowerCase() !== username.toLowerCase() || account.password !== password) {
         throw new Error('Username or password is incorrect for the selected workspace.');
       }
       const user = {
@@ -80,15 +115,89 @@ window.IMS = window.IMS || {};
         username: registration.username.trim().toLowerCase(),
         password: registration.password,
         name: [registration.firstName, registration.middleName, registration.surname].filter(Boolean).join(' '),
-        employeeId: registration.employeeId.trim(),
         title: registration.position.trim(),
         office: registration.office,
         email: registration.email.trim().toLowerCase(),
-        role: 'end-user'
+        role: registration.role
       };
       writeRegisteredAccount(account);
       return { ok: true, account };
     },
+    async requestPasswordReset(username) {
+      const account = findAccount(username);
+      if (!account) throw new Error('No account was found with that username.');
+      const normalizedUsername = account.username.toLowerCase();
+      const requests = readPasswordResetRequests();
+      if (requests.some(request => request.username === normalizedUsername
+        && ['Pending', 'Approved'].includes(request.status))) {
+        throw new Error('A password reset request is already active for this account.');
+      }
+      const request = {
+        id: `RESET-${Date.now()}`,
+        username: normalizedUsername,
+        accountName: account.name,
+        role: account.role,
+        status: 'Pending',
+        requestedAt: new Date().toISOString()
+      };
+      requests.unshift(request);
+      writePasswordResetRequests(requests);
+      window.dispatchEvent(new CustomEvent('ims:password-reset-updated'));
+      return { ok: true, request };
+    },
+    async resetPassword(username, password) {
+      const account = findAccount(username);
+      if (!account) throw new Error('No account was found with that username.');
+      const normalizedUsername = account.username.toLowerCase();
+      const requests = readPasswordResetRequests();
+      const approvedRequest = requests.find(request =>
+        request.username === normalizedUsername && request.status === 'Approved'
+      );
+      if (!approvedRequest) throw new Error('This password reset request has not been approved.');
+      if (Object.values(accounts).some(item => item.username.toLowerCase() === normalizedUsername)) {
+        const overrides = readPasswordOverrides();
+        overrides[normalizedUsername] = password;
+        localStorage.setItem(passwordOverridesKey, JSON.stringify(overrides));
+      } else {
+        const registeredAccounts = readRegisteredAccounts();
+        const registeredAccount = registeredAccounts.find(
+          item => item.username.toLowerCase() === normalizedUsername
+        );
+        if (!registeredAccount) throw new Error('No account was found with that username.');
+        registeredAccount.password = password;
+        localStorage.setItem(registeredAccountsKey, JSON.stringify(registeredAccounts));
+      }
+      requests.forEach(request => {
+        if (request.username === normalizedUsername && request.status === 'Approved') {
+          request.status = 'Completed';
+          request.completedAt = new Date().toISOString();
+        }
+      });
+      writePasswordResetRequests(requests);
+      window.dispatchEvent(new CustomEvent('ims:password-reset-updated'));
+      return { ok: true };
+    },
+    async approvePasswordReset(requestId) {
+      const requests = readPasswordResetRequests();
+      const request = requests.find(entry => entry.id === requestId);
+      if (!request || request.status !== 'Pending') throw new Error('This password reset request is no longer pending.');
+      request.status = 'Approved';
+      request.approvedAt = new Date().toISOString();
+      writePasswordResetRequests(requests);
+      window.dispatchEvent(new CustomEvent('ims:password-reset-updated'));
+      return { ok: true, request };
+    },
+    async rejectPasswordReset(requestId) {
+      const requests = readPasswordResetRequests();
+      const request = requests.find(entry => entry.id === requestId);
+      if (!request || request.status !== 'Pending') throw new Error('This password reset request is no longer pending.');
+      request.status = 'Rejected';
+      request.rejectedAt = new Date().toISOString();
+      writePasswordResetRequests(requests);
+      window.dispatchEvent(new CustomEvent('ims:password-reset-updated'));
+      return { ok: true, request };
+    },
+    readPasswordResetRequests,
     async getSession() {
       return readSession();
     },

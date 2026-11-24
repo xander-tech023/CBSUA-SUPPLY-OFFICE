@@ -404,7 +404,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     accountInfo.append(
       createElement('p', 'font-medium text-gray-900 dark:text-gray-100', `${currentUser.name} · ${currentUser.role}`),
       createElement('p', 'mt-1 text-xs text-gray-500 dark:text-gray-300', `Username: ${currentUser.username}`),
-      createElement('p', 'mt-2 text-xs text-gray-500 dark:text-gray-300', 'Admin and staff login credentials are fixed and cannot be changed here.')
+      createElement('p', 'mt-2 text-xs text-gray-500 dark:text-gray-300', 'Password changes are completed through approved administrator reset requests.')
     );
     dialogContent.append(accountHeading, accountInfo);
     const appearanceHeading = createElement('h3', 'border-t border-gray-200 pt-4 text-base font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100', 'Appearance');
