@@ -355,7 +355,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
       setCellDetails(existingRow.cells[2], request.item, request.quantity);
       const badge = existingRow.cells[4].querySelector('span');
       if (badge) Object.assign(badge, {
-        className: `badge rounded-full px-2 py-0.5 text-xs font-medium ${status === 'Approved' ? 'bg-green-100 text-green-700' : status === 'Issued' ? 'bg-blue-100 text-blue-700' : status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`,
+        className: `badge rounded-full px-2 py-0.5 text-xs font-medium ${status === 'Approved' ? 'bg-green-100 text-green-700' : status === 'Issued' ? 'bg-blue-100 text-blue-700' : ['Rejected', 'Cancelled', 'Canceled'].includes(status) ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`,
         textContent: status
       });
       const actionCell = existingRow.cells[5];
@@ -403,7 +403,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     const status = request.status || 'Pending';
     const statusCell = addCell('');
     statusCell.append(createElement('span',
-      `badge rounded-full px-2 py-0.5 text-xs font-medium ${status === 'Approved' ? 'bg-green-100 text-green-700' : status === 'Issued' ? 'bg-blue-100 text-blue-700' : status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`,
+      `badge rounded-full px-2 py-0.5 text-xs font-medium ${status === 'Approved' ? 'bg-green-100 text-green-700' : status === 'Issued' ? 'bg-blue-100 text-blue-700' : ['Rejected', 'Cancelled', 'Canceled'].includes(status) ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`,
       status));
     const actionCell = addCell('');
     if (status === 'Pending') {
@@ -427,7 +427,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
         actionCell.textContent = status;
       }
     }
-    table.prepend(row);
+    table.append(row);
   }
 
   function addSupplierCard(supplier) {
@@ -528,9 +528,12 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
       ? [...records].sort((left, right) =>
         left.id.localeCompare(right.id, undefined, { numeric: true, sensitivity: 'base' }))
       : currentPage === 'stock_request.html'
-        ? [...records].sort((left, right) =>
-          new Date(right.createdAt || right.date || 0) - new Date(left.createdAt || left.date || 0)
-          || right.id.localeCompare(left.id, undefined, { numeric: true, sensitivity: 'base' }))
+        ? [...records].sort((left, right) => {
+          const timestampDifference =
+            new Date(right.createdAt || `${right.date || ''}T23:59:59`) -
+            new Date(left.createdAt || `${left.date || ''}T23:59:59`);
+          return timestampDifference || String(right.id).localeCompare(String(left.id), undefined, { numeric: true });
+        })
         : records;
     recordsForDisplay.forEach(resource[1]);
     const filter = currentPage === 'inventory.html' ? document.querySelector('#searchInput')

@@ -4,7 +4,7 @@ window.IMS.pageFeatures.push(() => {
   if (!table || !document.querySelector('#requestModal')) return;
 
   const tabs = [...document.querySelectorAll('main button')]
-    .filter(button => /^(All requests|Pending|Approved|Issued|Rejected)/.test(button.textContent.trim()));
+    .filter(button => /^(All requests|Pending|Approved|Issued|Rejected|Cancelled|Canceled)/.test(button.textContent.trim()));
   const query = document.querySelector('main input[type="text"]');
   const office = document.querySelector('main select');
   const itemSelect = document.querySelector('#requestItem');
@@ -63,12 +63,18 @@ window.IMS.pageFeatures.push(() => {
       const label = button.textContent.split('·')[0].trim();
       const count = label === 'All requests'
         ? records.length
-        : records.filter(request => request.status.toLowerCase() === label.toLowerCase()).length;
+        : records.filter(request => {
+          const requestStatus = (request.status || 'Pending').toLowerCase();
+          return requestStatus === label.toLowerCase()
+            || (label.toLowerCase() === 'cancelled' && requestStatus === 'canceled');
+        }).length;
       button.textContent = `${label} · ${count}`;
     });
     [...table.rows].forEach(row => {
       const status = row.cells[4]?.innerText.toLowerCase() || '';
-      const statusMatch = !statusFilter || status.includes(statusFilter);
+      const statusMatch = !statusFilter
+        || status === statusFilter
+        || (statusFilter === 'cancelled' && status === 'canceled');
       const queryMatch = !query?.value || row.innerText.toLowerCase().includes(query.value.toLowerCase());
       const officeMatch = !office || office.selectedIndex === 0 || row.cells[1]?.innerText.includes(office.value);
       row.hidden = !(statusMatch && queryMatch && officeMatch);
@@ -91,12 +97,17 @@ window.IMS.pageFeatures.push(() => {
         request.id, request.date, request.office, request.recipient,
         request.employeeId, request.item, request.quantity
       ].map(value => value || '').join(' ').toLowerCase();
-      return (!statusFilter || status === statusFilter)
+      return (!statusFilter
+        || status === statusFilter
+        || (statusFilter === 'cancelled' && status === 'canceled'))
         && (!searchTerm || searchableText.includes(searchTerm))
         && (!officeTerm || String(request.office || '').toLowerCase().includes(officeTerm));
-    }).sort((left, right) =>
-      new Date(right.createdAt || right.date || 0) - new Date(left.createdAt || left.date || 0)
-      || right.id.localeCompare(left.id, undefined, { numeric: true, sensitivity: 'base' }));
+    }).sort((left, right) => {
+      const timestampDifference =
+        new Date(right.createdAt || `${right.date || ''}T23:59:59`) -
+        new Date(left.createdAt || `${left.date || ''}T23:59:59`);
+      return timestampDifference || String(right.id).localeCompare(String(left.id), undefined, { numeric: true });
+    });
 
     adminCardSummary.textContent = `Showing ${visibleRequests.length} of ${records.length} requests`;
     adminCardList.replaceChildren();
@@ -141,7 +152,7 @@ window.IMS.pageFeatures.push(() => {
       badge.className = `badge shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
         status === 'Approved' ? 'bg-green-100 text-green-700'
           : status === 'Issued' ? 'bg-blue-100 text-blue-700'
-          : status === 'Rejected' ? 'bg-red-100 text-red-700'
+          : ['Rejected', 'Cancelled', 'Canceled'].includes(status) ? 'bg-red-100 text-red-700'
           : 'bg-amber-100 text-amber-700'
       }`;
       badge.textContent = status;
