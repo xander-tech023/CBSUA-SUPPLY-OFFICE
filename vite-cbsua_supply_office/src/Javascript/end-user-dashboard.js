@@ -75,12 +75,20 @@ window.IMS.pageFeatures.push(() => {
     const actionCell = document.createElement('td');
     actionCell.className = 'py-3';
     if (status === 'Pending') {
+      const actions = document.createElement('div');
+      actions.className = 'flex flex-wrap gap-2';
+      const editButton = document.createElement('button');
+      editButton.type = 'button';
+      editButton.className = 'rounded-lg border border-cbsua-border px-3 py-1.5 text-xs font-medium text-cbsua-primary hover:bg-gray-50';
+      editButton.dataset.editRequest = request.id;
+      editButton.textContent = 'Edit request';
       const cancelButton = document.createElement('button');
       cancelButton.type = 'button';
       cancelButton.className = 'rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50';
       cancelButton.dataset.cancelRequest = request.id;
       cancelButton.textContent = 'Cancel request';
-      actionCell.append(cancelButton);
+      actions.append(editButton, cancelButton);
+      actionCell.append(actions);
     } else {
       actionCell.textContent = '—';
       actionCell.classList.add('text-cbsua-muted');
@@ -229,7 +237,9 @@ window.IMS.pageFeatures.push(() => {
     if (!itemSelect) return;
     const previousValue = itemSelect.value;
     const selectedClassification = requestClassifications[requestForm?.dataset.supplyClassification];
-    const availableItems = items.filter(item => Number(item.quantity) > 0);
+    const editingRequest = window.IMS.getLocalRecords('requests')
+      .find(request => request.id === requestForm?.dataset.editingRequest);
+    const availableItems = items.filter(item => Number(item.quantity) > 0 || item.id === editingRequest?.itemId);
     const selectableItems = availableItems.filter(item => !selectedClassification
       || String(item.supplyClassification || '').trim().toLowerCase() === selectedClassification.itemClassification);
     itemSelect.replaceChildren();
@@ -373,6 +383,15 @@ window.IMS.pageFeatures.push(() => {
     updateQuantityLimit(window.IMS.getLocalRecords('items').filter(item => Number(item.quantity) > 0));
   });
   requestList?.addEventListener('click', async event => {
+    const editButton = event.target.closest('[data-edit-request]');
+    if (editButton) {
+      const request = currentRequests.find(entry => entry.id === editButton.dataset.editRequest);
+      if (!request || request.status !== 'Pending') return;
+      window.dispatchEvent(new CustomEvent('ims:edit-request', {
+        detail: { requestId: request.id, opener: editButton }
+      }));
+      return;
+    }
     const cancelButton = event.target.closest('[data-cancel-request]');
     if (!cancelButton) return;
     const requestId = cancelButton.dataset.cancelRequest;

@@ -192,6 +192,17 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     return runMutation('save-record', { resource, record });
   }
 
+  function updateRequest(request) {
+    if (window.IMS.currentUser?.role !== 'end-user') {
+      window.IMS.showToast('Only end-users can edit their own pending requests.');
+      return null;
+    }
+    return runMutation('update-pending-request', {
+      requestId: request.id,
+      record: request
+    });
+  }
+
   async function updateRequestStatus(requestId, status) {
     if (window.IMS.currentUser?.role !== 'admin') {
       window.IMS.showToast('Only the Supply Office head can review requests.');
@@ -510,6 +521,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     getLocalRecords,
     getRemainingRequestQuantity,
     saveRecord,
+    updateRequest,
     updateRequestStatus,
     cancelRequest,
     updateInventoryItem,

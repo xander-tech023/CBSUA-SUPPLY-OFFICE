@@ -92,12 +92,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const value = Number(match[1]);
     return Number.isSafeInteger(value) ? value : 0;
   }
-  function getQuarterlyRequestUsage(item, officeName, referenceDate = new Date()) {
+  function getQuarterlyRequestUsage(item, officeName, referenceDate = new Date(), excludedRequestId = '') {
     if (!item || !officeName) return 0;
     const quarter = getQuarterKey(referenceDate);
     const normalizedOffice = String(officeName).trim().toLowerCase();
     const normalizedItemName = String(item.name || '').trim().toLowerCase();
     return getLocalRecords('requests').reduce((total, request) => {
+      if (excludedRequestId && String(request.id) === String(excludedRequestId)) return total;
       const status = String(request.status || 'Pending').trim().toLowerCase();
       if (['rejected', 'cancelled', 'canceled'].includes(status)) return total;
       if (String(request.office || '').trim().toLowerCase() !== normalizedOffice) return total;
@@ -109,10 +110,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       return total + getRequestQuantity(request.quantity);
     }, 0);
   }
-  function getQuarterlyRequestLimitRemaining(itemId, officeName) {
+  function getQuarterlyRequestLimitRemaining(
+    itemId, officeName, excludedRequestId = '', referenceDate = new Date()
+  ) {
     const item = getLocalRecords('items').find(entry => String(entry.id) === String(itemId));
     if (!item) return 0;
-    return Math.max(0, quarterlyRequestLimit - getQuarterlyRequestUsage(item, officeName));
+    return Math.max(0, quarterlyRequestLimit - getQuarterlyRequestUsage(
+      item, officeName, referenceDate, excludedRequestId
+    ));
   }
   function updateRequestLimitHint() {
     const requestForm = document.querySelector('#requestForm');
@@ -125,7 +130,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       limitHint.textContent = `Quarterly limit: ${quarterlyRequestLimit} units per item for each office.`;
       return;
     }
-    const remaining = getQuarterlyRequestLimitRemaining(item.id, officeName);
+    const editingRequest = getLocalRecords('requests')
+      .find(request => request.id === requestForm.dataset.editingRequest);
+    const remaining = getQuarterlyRequestLimitRemaining(
+      item.id, officeName, editingRequest?.id || '', editingRequest?.date || new Date()
+    );
     limitHint.textContent = `Quarterly limit: ${quarterlyRequestLimit} ${item.unit} per office for this item · ${remaining} ${item.unit} remaining this quarter. Pending, approved, and issued requests count.`;
   }
   const modalId = {
@@ -185,7 +194,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     form.querySelector('[data-request-form-summary]').textContent =
       `${classification.label} · ${classification.documentType} — ${classification.documentName}`;
     const heading = pageModal.querySelector('[data-request-dialog-title]');
-    if (heading) heading.textContent = `Create ${classification.label} request`;
+    if (heading) heading.textContent = `${form.dataset.editingRequest ? 'Edit' : 'Create'} ${classification.label} request`;
     const chooser = pageModal.querySelector('[data-request-classification-step]');
     if (chooser) chooser.hidden = true;
     form.querySelectorAll('[data-request-classification-fields]').forEach(section => {
@@ -209,7 +218,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (pageModal.id === 'requestModal') {
       const requestForm = pageModal.querySelector('#requestForm');
       if (requestForm) {
+        delete requestForm.dataset.editingRequest;
         resetRequestClassification(requestForm);
+        const submitButton = requestForm.querySelector('button[type="submit"]');
+        if (submitButton) submitButton.textContent = 'Submit request';
         requestForm.querySelector('#requestId').value = nextRequestId();
         const today = new Date();
         today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
@@ -218,6 +230,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           requestForm.querySelector('#requestOffice').value = currentUser.office || '';
           requestForm.querySelector('#requestRecipient').value = currentUser.name || currentUser.username;
           requestForm.querySelector('#requestEmployeeId').value = currentUser.employeeId || '';
+          requestForm.querySelector('#requestEmployeeId').readOnly = false;
         }
         const officeOverride = new URLSearchParams(location.search).get('office');
         if (officeOverride) requestForm.querySelector('#requestOffice').value = officeOverride;
@@ -255,6 +268,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     form.reset();
     delete form.dataset.editingItem;
     delete form.dataset.editingSupplier;
+    delete form.dataset.editingRequest;
+    const requestSubmitButton = form.querySelector('button[type="submit"]');
+    if (form.id === 'requestForm' && requestSubmitButton) {
+      requestSubmitButton.textContent = 'Submit request';
+    }
     const idField = form.querySelector('input');
     if (idField) idField.readOnly = form.id === 'supplierForm' || form.id === 'addItemForm';
     const heading = form.closest('.fixed')?.querySelector('h3');
@@ -910,11 +928,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         const quantity = Number(form.querySelector('#requestQuantity').value);
         const classificationKey = form.dataset.supplyClassification;
         const classification = requestClassifications[classificationKey];
+        const editingRequestId = form.dataset.editingRequest || '';
+        const requestBeingEdited = editingRequestId
+          ? getLocalRecords('requests').find(entry => entry.id === editingRequestId)
+          : null;
         if (!item || !Number.isSafeInteger(quantity) || quantity <= 0) {
           return showToast('Choose an item and enter a whole-number quantity greater than zero.');
         }
         if (!classification) {
           return showToast('Choose a Supply Classification before completing the request form.');
+        }
+        if (editingRequestId && (!requestBeingEdited
+          || requestBeingEdited.status !== 'Pending'
+          || currentUser.role !== 'end-user'
+          || String(requestBeingEdited.requesterId) !== String(currentUser.id)
+          || String(requestBeingEdited.office || '').trim().toLowerCase()
+            !== String(currentUser.office || '').trim().toLowerCase())) {
+          return showToast('Only your own pending requests for your office can be edited.');
+        }
+        if (String(item.supplyClassification || '').trim().toLowerCase() !== classification.label.toLowerCase()) {
+          return showToast('Choose an item that matches the selected supply classification.');
         }
         const today = new Date();
         today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
@@ -965,9 +998,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           requestOffice.value = officeOverride;
         }
         const request = {
-          id: nextRequestId(),
-          date: requestDate,
-          createdAt: new Date().toISOString(),
+          id: requestBeingEdited?.id || nextRequestId(),
+          date: requestBeingEdited?.date || requestDate,
+          createdAt: requestBeingEdited?.createdAt || new Date().toISOString(),
           office: form.querySelector('#requestOffice').value,
           recipient: form.querySelector('#requestRecipient').value.trim(),
           employeeId: form.querySelector('#requestEmployeeId').value.trim().toUpperCase(),
@@ -991,21 +1024,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (currentUser.role === 'end-user' && quantity > item.quantity) {
           return showToast(`Only ${item.quantity} ${item.unit} are currently available.`);
         }
-        const remainingQuarterlyQuantity = getQuarterlyRequestLimitRemaining(itemId, request.office);
+        const remainingQuarterlyQuantity = getQuarterlyRequestLimitRemaining(
+          itemId, request.office, requestBeingEdited?.id || '', requestBeingEdited?.date || new Date()
+        );
         if (quantity > remainingQuarterlyQuantity) {
           return showToast(
             `Quarterly limit exceeded. This office may request up to ${quarterlyRequestLimit} ${item.unit} of this item per quarter; ${remainingQuarterlyQuantity} ${item.unit} remain.`
           );
         }
-        if (getLocalRecords('requests').some(savedRequest => savedRequest.id === request.id)) {
+        if (!requestBeingEdited && getLocalRecords('requests').some(savedRequest => savedRequest.id === request.id)) {
           return showToast(`${request.id} already exists.`);
         }
-        const savedRequest = await saveRecord('requests', request);
+        const savedRequest = requestBeingEdited
+          ? await window.IMS.updateRequest(request)
+          : await saveRecord('requests', request);
         if (!savedRequest) return;
         form.reset();
+        delete form.dataset.editingRequest;
+        const submitButton = form.querySelector('button[type="submit"]');
+        if (submitButton) submitButton.textContent = 'Submit request';
         closeModal();
         window.IMS.refreshPage();
-        return showToast(`${savedRequest.id} saved successfully as pending.`);
+        return showToast(requestBeingEdited
+          ? `${savedRequest.id} updated successfully.`
+          : `${savedRequest.id} saved successfully as pending.`);
       }
       if (form.id === 'supplierForm') {
         const fields = [...form.querySelectorAll('input, select, textarea')];
@@ -1114,6 +1156,62 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('ims:records-updated', updatePendingCount);
   updatePendingCount();
   applyPreferences();
+  window.addEventListener('ims:edit-request', event => {
+    const requestId = event.detail?.requestId;
+    const request = getLocalRecords('requests').find(entry => entry.id === requestId);
+    if (!pageModal || pageModal.id !== 'requestModal' || currentUser.role !== 'end-user'
+      || !request || request.status !== 'Pending'
+      || String(request.requesterId) !== String(currentUser.id)
+      || String(request.office || '').trim().toLowerCase()
+        !== String(currentUser.office || '').trim().toLowerCase()) {
+      return showToast('Only your own pending requests for your office can be edited.');
+    }
+
+    const classificationKey = Object.keys(requestClassifications).find(key =>
+      requestClassifications[key].label.toLowerCase()
+        === String(request.supplyClassification || '').trim().toLowerCase());
+    if (!classificationKey) return showToast('This request has an unsupported supply classification.');
+
+    openModal(event.detail?.opener);
+    const form = pageModal.querySelector('#requestForm');
+    form.dataset.editingRequest = request.id;
+    selectRequestClassification(classificationKey);
+    form.querySelector('#requestId').value = request.id;
+    form.querySelector('#requestDate').value = request.date || '';
+    form.querySelector('#requestOffice').value = currentUser.office || request.office || '';
+    form.querySelector('#requestRecipient').value = currentUser.name || request.recipient || '';
+    form.querySelector('#requestEmployeeId').value = request.employeeId || currentUser.employeeId || '';
+    form.querySelector('#requestEmployeeId').readOnly = true;
+    form.querySelector('#requestItem').value = request.itemId;
+    form.querySelector('#requestItem').dispatchEvent(new Event('change', { bubbles: true }));
+    form.querySelector('#requestQuantity').value = getRequestQuantity(request.quantity) || '';
+    form.querySelector('#requestRemarks').value = request.remarks || '';
+
+    const details = request.classificationDetails || {};
+    const detailFields = {
+      '#requestIcsSpecifications': details.specifications,
+      '#requestUsefulLife': details.estimatedUsefulLifeYears,
+      '#requestIcsUnitCost': details.unitCost,
+      '#requestIcsSupplier': details.supplier,
+      '#requestIcsDeliveryReceiptDate': details.deliveryReceiptDate,
+      '#requestIcsPurchaseOrderDate': details.purchaseOrderDate,
+      '#requestIcsIarDate': details.iarDate,
+      '#requestSpecifications': details.specifications,
+      '#requestParPropertyNumber': details.propertyNumber,
+      '#requestParDateAcquired': details.dateAcquired,
+      '#requestParAmount': details.amount,
+      '#requestParSupplier': details.supplier
+    };
+    Object.entries(detailFields).forEach(([selector, value]) => {
+      const field = form.querySelector(selector);
+      if (field) field.value = value ?? '';
+    });
+
+    const heading = pageModal.querySelector('[data-request-dialog-title]');
+    if (heading) heading.textContent = 'Edit pending request';
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (submitButton) submitButton.textContent = 'Save changes';
+  });
   setupActions();
   setupForms();
   const requestForm = document.querySelector('#requestForm');

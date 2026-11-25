@@ -421,6 +421,108 @@ async function saveRequest(connection, record, user) {
   return requestCode;
 }
 
+async function updatePendingRequest(connection, requestCode, record, user) {
+  if (user.role !== 'end-user') {
+    throw new ApiError(403, 'Only end-users can edit their own pending requests.');
+  }
+  const [requestRows] = await connection.execute(
+    `SELECT id, request_date, office_id, requester_id, status
+       FROM stock_requests WHERE request_code = ? FOR UPDATE`,
+    [String(requestCode || '')]
+  );
+  const request = requestRows[0];
+  if (!request) throw new ApiError(404, 'The stock request could not be found.');
+  const office = await officeByName(connection, user.office);
+  if (String(request.requester_id) !== String(user.id)
+    || String(request.office_id) !== String(office.id)) {
+    throw new ApiError(403, 'You can only edit requests submitted by your account for your office.');
+  }
+  if (request.status !== 'Pending') {
+    throw new ApiError(409, 'Only pending requests can be edited.');
+  }
+
+  const item = await getItemByCode(connection, record.itemId, true);
+  const quantity = requestedQuantity(record.quantity);
+  if (!Number.isSafeInteger(quantity)) {
+    throw new ApiError(400, 'Enter a whole-number request quantity.');
+  }
+  if (quantity > Number(item.quantity_on_hand)) {
+    throw new ApiError(409, `Only ${Number(item.quantity_on_hand)} ${item.unit} are currently available.`);
+  }
+  const supply = normaliseSupplyClassification(record.supplyClassification);
+  const documentType = toDocumentType(record.documentType);
+  if (!supply || (documentType === 'RIS' && supply !== 'Consumable')
+    || (documentType === 'ICS' && supply !== 'Semi-expendable')
+    || (documentType === 'PAR' && supply !== 'Fixed Asset')) {
+    throw new ApiError(400, 'The supply classification and document type do not match.');
+  }
+  if (normaliseSupplyClassification(item.supply_classification) !== supply) {
+    throw new ApiError(400, 'The selected inventory item does not match the supply classification.');
+  }
+
+  const requestDate = dateOnly(request.request_date, 'Request date');
+  const date = new Date(`${requestDate}T00:00:00Z`);
+  const year = String(date.getUTCFullYear());
+  const quarterStartMonth = Math.floor(date.getUTCMonth() / 3) * 3;
+  const quarterStart = `${year}-${String(quarterStartMonth + 1).padStart(2, '0')}-01`;
+  const quarterEndDate = new Date(Date.UTC(date.getUTCFullYear(), quarterStartMonth + 3, 0));
+  const quarterEnd = quarterEndDate.toISOString().slice(0, 10);
+  const [usageRows] = await connection.execute(
+    `SELECT COALESCE(SUM(quantity), 0) AS total FROM stock_requests
+      WHERE office_id = ? AND item_id = ? AND request_date BETWEEN ? AND ?
+        AND status NOT IN ('Rejected', 'Cancelled') AND id <> ?`,
+    [office.id, item.id, quarterStart, quarterEnd, request.id]
+  );
+  if (Number(usageRows[0].total) + quantity > 40) {
+    throw new ApiError(409, 'The quarterly limit of 40 units per item and office would be exceeded.');
+  }
+
+  const details = record.classificationDetails && typeof record.classificationDetails === 'object'
+    && !Array.isArray(record.classificationDetails)
+    ? record.classificationDetails
+    : {};
+  const specifications = String(details.specifications || '').trim();
+  if (documentType !== 'RIS' && !specifications) {
+    throw new ApiError(400, 'Enter the specifications required for this request.');
+  }
+  const recipient = String(user.name || '').trim();
+  const employeeId = String(user.employeeId || '').trim().toUpperCase();
+  if (!recipient || recipient.length > 150 || !/^[A-Z0-9-]{3,24}$/.test(employeeId)) {
+    throw new ApiError(400, 'Your account must have a valid name and employee ID to edit this request.');
+  }
+  const supplier = String(details.supplier || '').trim();
+  const propertyNumber = String(details.propertyNumber || '').trim();
+  const remarks = String(record.remarks || '').trim();
+  if (supplier.length > 150 || propertyNumber.length > 80 || remarks.length > 2000) {
+    throw new ApiError(400, 'Request details exceed the allowed length.');
+  }
+
+  await connection.execute(
+    `UPDATE stock_requests
+        SET item_id = ?, quantity = ?, supply_classification = ?, document_type = ?,
+            recipient_name = ?, recipient_employee_id = ?, specifications = ?,
+            estimated_useful_life_years = ?, unit_cost = ?, supplier_name = ?,
+            delivery_receipt_date = ?, purchase_order_date = ?, iar_date = ?,
+            property_number = ?, date_acquired = ?, amount = ?, remarks = ?
+      WHERE id = ?`,
+    [
+      item.id, quantity, supply, documentType, recipient, employeeId, specifications || null,
+      numericValue(details.estimatedUsefulLifeYears, 'Useful life', { minimum: 1, allowEmpty: true }),
+      numericValue(details.unitCost, 'Unit cost', { allowEmpty: true }),
+      supplier || null,
+      optionalDate(details.deliveryReceiptDate, 'Delivery receipt date'),
+      optionalDate(details.purchaseOrderDate, 'Purchase order date'),
+      optionalDate(details.iarDate, 'IAR date'),
+      propertyNumber || null,
+      optionalDate(details.dateAcquired, 'Acquisition date'),
+      numericValue(details.amount, 'Amount', { allowEmpty: true }),
+      remarks || null,
+      request.id
+    ]
+  );
+  return String(requestCode);
+}
+
 async function saveReceipt(connection, record, user) {
   const item = await getItemByCode(connection, record.itemId, true);
   const quantity = numericValue(record.quantity, 'Receipt quantity', { minimum: Number.MIN_VALUE });
@@ -998,7 +1100,7 @@ function registerDatabaseApi(app, pool) {
 
   app.post('/api/records/mutation', authenticated, route(async (request, response) => {
     const { action, payload = {} } = request.body || {};
-    if (!['save-record', 'update-record', 'update-request-status', 'cancel-request'].includes(action)) {
+    if (!['save-record', 'update-record', 'update-request-status', 'update-pending-request', 'cancel-request'].includes(action)) {
       throw new ApiError(400, 'Unknown record operation.');
     }
     let resource = '';
@@ -1038,6 +1140,10 @@ function registerDatabaseApi(app, pool) {
         resource = 'requests';
         savedId = String(payload.requestId || '');
         await setRequestStatus(connection, savedId, payload.status, request.user);
+      } else if (action === 'update-pending-request') {
+        resource = 'requests';
+        savedId = String(payload.requestId || '');
+        await updatePendingRequest(connection, savedId, payload.record || {}, request.user);
       } else {
         resource = 'requests';
         savedId = String(payload.requestId || '');

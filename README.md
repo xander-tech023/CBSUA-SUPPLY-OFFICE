@@ -37,7 +37,7 @@ npm run dev -- --host 0.0.0.0
 
 Vite proxies `/api` requests to `http://127.0.0.1:3001`. Build the frontend with `npm run build` from `vite-cbsua_supply_office`; the API serves the built files from `vite-cbsua_supply_office/dist`. Set `PUBLIC_APP_URL` to the public application base URL when deploying behind a domain or path prefix. Set `TRUST_PROXY=1` when HTTPS is terminated by a trusted reverse proxy.
 
-The database stores users, inventory items, categories, suppliers, requests, receipts, issuances, stock movements, request status history, and password reset requests. Receipt and issuance stock changes, request approvals/cancellations, and generated references are handled by database transactions. Fund Cluster, P.O. No., and IAR No. sequences continue across months and restart each year.
+The database stores users, inventory items, categories, suppliers, requests, receipts, issuances, stock movements, request status history, and password reset requests. End-users can edit the item, classification, quantity, and remarks on their own pending requests for their office; reviewed requests cannot be edited. Receipt and issuance stock changes, request edits, approvals/cancellations, and generated references are handled by database transactions. Fund Cluster, P.O. No., and IAR No. sequences continue across months and restart each year.
 
 Password reset requests are stored in the database and require administrator approval. Delivery attachments are not uploaded; only the selected filename is stored.
 
