@@ -58,7 +58,11 @@ window.IMS.pageFeatures.push(() => {
     if (previewNote) previewNote.textContent = `Preview only — inventory currently shows ${item.quantity} ${item.unit}.`;
     if (readyCard) {
       const values = [...readyCard.querySelectorAll('.flex.justify-between span:last-child')];
-      if (values[0]) values[0].textContent = window.IMS.nextRecordId('receipts', 'RCV-2026-', 27);
+      if (values[0]) {
+        values[0].textContent = window.IMS.nextRecordId(
+          'receipts', `RCV-${new Date().getFullYear()}-`, 0
+        );
+      }
       if (values[1]) values[1].textContent = supplierSelect.selectedOptions[0]?.textContent || '—';
       if (values[2]) values[2].textContent = window.IMS.currentUser.name;
       if (values[3]) values[3].textContent = form.dataset.attachmentName || 'No attachment selected';

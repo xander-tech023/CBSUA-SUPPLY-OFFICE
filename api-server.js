@@ -1,5 +1,8 @@
 const express = require('express');
+const os = require('node:os');
 const path = require('node:path');
+const { initializeDatabase } = require('./database');
+const { registerDatabaseApi, createErrorHandler } = require('./database-api');
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
@@ -31,16 +34,36 @@ const assetFields = [
 
 app.use(express.json({ limit: '8kb' }));
 
+function getLanIPv4Address() {
+  const addresses = Object.values(os.networkInterfaces())
+    .flatMap(network => network || [])
+    .filter(address => address.family === 'IPv4' && !address.internal
+      && !address.address.startsWith('169.254.'));
+  const privateAddress = addresses.find(({ address }) =>
+    /^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(address));
+  return (privateAddress || addresses[0])?.address || '';
+}
+
 function createScannerUrl(appUrl, request, asset) {
   const configuredAppUrl = process.env.PUBLIC_APP_URL || appUrl || `${request.protocol}://${request.get('host')}`;
   let base;
   try {
     base = new URL(configuredAppUrl);
   } catch {
-    throw new Error('The application URL must be an absolute HTTP or HTTPS URL.');
+    throw new Error('The application URL must be an absolute HTTP or HTTPS base URL.');
+  }
+  const isLoopback = base.hostname === 'localhost'
+    || base.hostname === '::1'
+    || /^127(?:\.\d{1,3}){3}$/.test(base.hostname);
+  if (!process.env.PUBLIC_APP_URL && isLoopback) {
+    const lanAddress = getLanIPv4Address();
+    if (!lanAddress) {
+      throw new Error('A LAN address could not be detected. Set PUBLIC_APP_URL to an address reachable from the phone.');
+    }
+    base.hostname = lanAddress;
   }
   if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.search || base.hash) {
-    throw new Error('The application URL must be a public HTTP or HTTPS base URL without credentials or query parameters.');
+    throw new Error('The application URL must be an HTTP or HTTPS base URL without credentials or query parameters.');
   }
 
   const appPath = base.pathname.replace(/\/+$/, '');
@@ -78,10 +101,6 @@ function createScannerUrl(appUrl, request, asset) {
   return scannerUrl.toString();
 }
 
-app.get('/api/health', (request, response) => {
-  response.json({ status: 'ok' });
-});
-
 app.get('/api/scanner-link', (request, response) => {
   try {
     response.json({ url: createScannerUrl(request.query.appUrl, request, null) });
@@ -98,8 +117,18 @@ app.post('/api/scanner-link', (request, response) => {
   }
 });
 
-app.use(express.static(distDirectory));
+async function startServer() {
+  const pool = await initializeDatabase();
+  app.set('trust proxy', process.env.TRUST_PROXY === '1');
+  registerDatabaseApi(app, pool);
+  app.use(express.static(distDirectory));
+  app.use(createErrorHandler());
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Supply Office API listening on port ${port}`);
+  });
+}
 
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Scanner API listening on port ${port}`);
+startServer().catch(error => {
+  console.error('The API could not start.', error);
+  process.exitCode = 1;
 });

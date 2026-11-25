@@ -40,12 +40,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     await window.IMS.initializeRecords();
+    await window.IMS.accounts.initialize(currentUser);
     window.dispatchEvent(new CustomEvent('ims:records-updated'));
   } catch (error) {
     console.error('The workspace could not be initialized.', error);
     const message = document.createElement('p');
     message.className = 'mx-auto mt-12 max-w-xl rounded-lg bg-red-50 p-5 text-red-800';
-    message.textContent = 'Could not initialize the local workspace. Reload this page and try again.';
+    message.textContent = 'Could not connect to the database-backed workspace. Check that MySQL and the API are running, then reload this page.';
     document.body.replaceChildren(message);
     return;
   }
@@ -73,22 +74,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     getLocalRecords, saveRecord, updateRequestStatus, updateInventoryItem, updateSupplier, addInventoryRow,
     addRequestRow, addSupplierCard, nextRecordId, nextRequestId
   } = window.IMS;
-  function nextGeneratedReference(prefix, transactionDate) {
-    const [year, month] = transactionDate.split('-');
-    const fieldByPrefix = {
-      FC: 'fundCluster',
-      PO: 'purchaseOrderNumber',
-      IAR: 'iarNumber'
-    };
-    const field = fieldByPrefix[prefix];
-    const pattern = new RegExp(`^${prefix}-(\\d{4})-\\d{2}-(\\d{3})$`);
-    const sequence = getLocalRecords('requests').reduce((maximum, request) => {
-      const value = request.classificationDetails?.[field];
-      const match = String(value || '').match(pattern);
-      return match && match[1] === year ? Math.max(maximum, Number(match[2])) : maximum;
-    }, 0) + 1;
-    return `${prefix}-${year}-${month}-${String(sequence).padStart(3, '0')}`;
-  }
   const quarterlyRequestLimit = 40;
   function getQuarterKey(value) {
     let date;
@@ -173,6 +158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!form) return;
     form.hidden = true;
     delete form.dataset.supplyClassification;
+    window.dispatchEvent(new CustomEvent('ims:request-classification-changed'));
     form.querySelector('#requestSupplyClassification').value = '';
     form.querySelector('#requestFormDocumentType').value = '';
     form.querySelector('[data-request-form-summary]').textContent = '';
@@ -193,6 +179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const classification = requestClassifications[classificationKey];
     if (!form || !classification) return;
     form.dataset.supplyClassification = classificationKey;
+    window.dispatchEvent(new CustomEvent('ims:request-classification-changed'));
     form.querySelector('#requestSupplyClassification').value = classification.label;
     form.querySelector('#requestFormDocumentType').value = classification.documentType;
     form.querySelector('[data-request-form-summary]').textContent =
@@ -239,11 +226,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (pageModal.id === 'addItemModal' && !pageModal.querySelector('#addItemForm').dataset.editingItem) {
       const itemIdField = pageModal.querySelector('#itemInventoryId');
-      itemIdField.value = nextRecordId('items', 'ITM-', 8);
+      itemIdField.value = nextRecordId('items', 'ITM-', 0);
       itemIdField.readOnly = true;
     }
     if (pageModal.id === 'supplierModal' && !pageModal.querySelector('#supplierForm').dataset.editingSupplier) {
-      pageModal.querySelector('#supplierForm input').value = nextRecordId('suppliers', 'SUP-', 3);
+      pageModal.querySelector('#supplierForm input').value = nextRecordId('suppliers', 'SUP-', 0);
     }
     pageModal.classList.remove('hidden');
     const dialog = pageModal.firstElementChild;
@@ -858,18 +845,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
     });
-    dialog.addEventListener('click', event => {
-      if (event.target === dialog) closeDialog();
-    });
     dialog.addEventListener('keydown', event => trapFocus(
       event,
       dialog,
       'button:not([disabled]), select:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
     ));
     if (pageModal) {
-      pageModal.addEventListener('click', event => {
-        if (event.target === pageModal) closeModal();
-      });
       pageModal.addEventListener('keydown', event => trapFocus(
         event,
         pageModal,
@@ -878,8 +859,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') {
-        if (pageModal && !pageModal.classList.contains('hidden')) closeModal();
-        closeDialog();
         setMenuOpen(false);
       }
     });
@@ -909,9 +888,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           unit: fields[6].value.trim(), minimum, quantity, expiry: fields[9].value
         };
         const itemIdBeingEdited = form.dataset.editingItem;
-        if (!itemIdBeingEdited && getLocalRecords('items').some(savedItem => savedItem.id === item.id)) {
-          return showToast(`${item.id} already exists in this inventory.`);
-        }
         const savedItem = itemIdBeingEdited
           ? await updateInventoryItem(itemIdBeingEdited, item)
           : await saveRecord('items', item);
@@ -926,7 +902,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelector('#addItemModal h3').textContent = 'Add a new inventory item';
         closeModal();
         window.IMS.refreshPage();
-        return showToast(`${item.id} ${itemIdBeingEdited ? 'updated' : 'saved'} successfully.`);
+        return showToast(`${savedItem.id} ${itemIdBeingEdited ? 'updated' : 'saved'} successfully.`);
       }
       if (form.id === 'requestForm') {
         const itemId = form.querySelector('#requestItem').value;
@@ -943,11 +919,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const today = new Date();
         today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
         const requestDate = today.toISOString().slice(0, 10);
-        const classificationDetails = {
-          fundCluster: nextGeneratedReference('FC', requestDate),
-          purchaseOrderNumber: nextGeneratedReference('PO', requestDate),
-          iarNumber: nextGeneratedReference('IAR', requestDate)
-        };
+        const classificationDetails = {};
         if (classificationKey === 'semi-expendable') {
           const specifications = form.querySelector('#requestIcsSpecifications').value.trim();
           if (!specifications) return showToast('Enter the specifications required for the ICS request.');
@@ -1033,7 +1005,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         form.reset();
         closeModal();
         window.IMS.refreshPage();
-        return showToast(`${request.id} saved successfully as pending.`);
+        return showToast(`${savedRequest.id} saved successfully as pending.`);
       }
       if (form.id === 'supplierForm') {
         const fields = [...form.querySelectorAll('input, select, textarea')];
@@ -1044,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const supplierBeingEdited = form.dataset.editingSupplier;
         if (getLocalRecords('suppliers').some(entry =>
           entry.id !== supplierBeingEdited
-          && (entry.id === supplier.id || entry.name.toLowerCase() === supplier.name.toLowerCase()))) {
+          && entry.name.toLowerCase() === supplier.name.toLowerCase())) {
           return showToast('A supplier with this ID or name already exists.');
         }
         const savedSupplier = supplierBeingEdited
@@ -1054,16 +1026,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (supplierBeingEdited) window.IMS.refreshPage();
         else {
           addSupplierCard(savedSupplier);
-          fields[0].value = nextRecordId('suppliers', 'SUP-', 3);
+          fields[0].value = nextRecordId('suppliers', 'SUP-', 0);
           const list = document.querySelector('main .space-y-4');
           const count = [...document.querySelectorAll('main p')].find(paragraph => paragraph.textContent.includes('supplier records'));
           if (count && list) count.textContent = `${list.children.length} suppliers`;
           window.IMS.refreshPage();
         }
         resetModalForm(form);
-        if (form.id === 'supplierForm') fields[0].value = nextRecordId('suppliers', 'SUP-', 3);
+        if (form.id === 'supplierForm') fields[0].value = nextRecordId('suppliers', 'SUP-', 0);
         closeModal();
-        return showToast(`${supplier.name} ${supplierBeingEdited ? 'updated' : 'saved'} successfully.`);
+        return showToast(`${savedSupplier.id} — ${supplier.name} ${supplierBeingEdited ? 'updated' : 'saved'} successfully.`);
       }
       if (form.id === 'receiveForm') {
         const quantity = Number(form.querySelector('#receiveQuantity').value);
@@ -1076,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           return showToast('This delivery reference has already been recorded.');
         }
         const receipt = {
-          id: nextRecordId('receipts', 'RCV-2026-', 27),
+          id: nextRecordId('receipts', `RCV-${new Date().getFullYear()}-`, 0),
           supplier: form.querySelector('#receiveSupplier').selectedOptions[0].textContent.split(' — ').slice(1).join(' — '),
           deliveryReference, itemId, itemName: item.name,
           quantity,
@@ -1096,7 +1068,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
         form.querySelector('#receivedDate').value = today.toISOString().slice(0, 10);
         window.IMS.refreshPage?.();
-        return showToast(`Saved successfully and supply record updated.`);
+        return showToast(`${savedReceipt.id} saved successfully and supply record updated.`);
       }
       if (form.id === 'issueForm') {
         const requestId = form.querySelector('#issueRequest').value;
@@ -1111,7 +1083,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (!document.querySelector('#issueConfirmed').checked) return showToast('Confirm the recipient and physical quantity before issuing.');
         const issuance = {
-          id: nextRecordId('issuances', 'ISS-2026-', 20), requestId,
+          id: nextRecordId('issuances', `ISS-${new Date().getFullYear()}-`, 0), requestId,
           itemId, itemName: item.name, quantity,
           office: request.office, recipient: form.querySelector('#issueRecipient').value,
           recipientEmployeeId: request.employeeId || '',
@@ -1123,7 +1095,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.dispatchEvent(new CustomEvent('ims:issuance-saved', { detail: savedIssuance }));
         form.reset();
         window.IMS.refreshPage?.();
-        return showToast(`${issuance.id} saved successfully and stock balance updated.`);
+        return showToast(`${savedIssuance.id} saved successfully and stock balance updated.`);
       }
     }, true);
   }

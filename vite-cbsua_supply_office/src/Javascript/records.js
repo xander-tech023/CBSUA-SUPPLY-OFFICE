@@ -1,11 +1,12 @@
+import { apiRequest, jsonRequest } from './api-client.js';
+
 window.IMS = window.IMS || {};
 window.IMS.pageFeatures = window.IMS.pageFeatures || [];
 
 (() => {
-  const resources = ['items', 'requests', 'suppliers', 'receipts', 'issuances'];
+  const resources = ['items', 'requests', 'suppliers', 'receipts', 'issuances', 'categories'];
   const records = Object.fromEntries(resources.map(resource => [resource, []]));
-  const storageKey = 'cbsuaSupplyRecords';
-  const seedRecords = {
+  const _seedRecords = {
     items: [
       { id: 'ITM-001', name: 'Bond paper, A4', description: '', category: 'Paper supplies', quantity: 18, unit: 'reams', supplier: 'Bicol Office Depot', minimum: 20, expiry: null, status: 'Low stock' },
       { id: 'ITM-002', name: 'Bond paper, letter', description: '', category: 'Paper supplies', quantity: 240, unit: 'reams', supplier: 'Bicol Office Depot', minimum: 50, expiry: null, status: 'In stock' },
@@ -160,132 +161,28 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     return Math.max(0, requested - issued);
   }
 
-  function updateInventoryStatus(item) {
-    const expiry = item.expiry && new Date(`${item.expiry}T00:00:00`);
-    const daysUntilExpiry = expiry ? Math.ceil((expiry - new Date()) / 86400000) : Infinity;
-    item.status = item.quantity <= 0
-      ? 'Out of stock'
-      : daysUntilExpiry <= 45
-        ? 'Expiring soon'
-        : !item.expiry && item.status?.toLowerCase().includes('expiring')
-          ? item.quantity <= item.minimum ? 'Low expiring' : 'Expiring soon'
-        : item.quantity <= item.minimum
-          ? 'Low stock'
-          : 'In stock';
-  }
-
-  function readStoredRecords() {
-    try {
-      const stored = JSON.parse(localStorage.getItem(storageKey));
-      if (stored && resources.every(resource => Array.isArray(stored[resource]))) return stored;
-    } catch {
-      // Fall back to starter records when browser storage is unavailable or invalid.
+  function replaceRecords(stored) {
+    if (!stored || !resources.every(resource => Array.isArray(stored[resource]))) {
+      throw new Error('The database returned incomplete record data.');
     }
-    return structuredClone(seedRecords);
-  }
-
-  function persistRecords() {
-    localStorage.setItem(storageKey, JSON.stringify(records));
-  }
-
-  async function loadRecords() {
-    const stored = readStoredRecords();
     for (const resource of resources) {
       records[resource] = stored[resource].map(record => ({ ...record }));
     }
   }
 
-  function replaceStoredResource(resource, record, recordId) {
-    const index = records[resource].findIndex(entry => entry.id === recordId);
-    if (index >= 0) records[resource][index] = record;
-    else records[resource].push(record);
+  async function loadRecords() {
+    const response = await apiRequest('/api/records');
+    replaceRecords(response.records);
   }
 
   async function runMutation(action, payload) {
     try {
-      let result = true;
-      if (action === 'save-record') {
-        const { resource, record } = payload;
-        if (!resources.includes(resource)) throw new Error('A valid record type is required.');
-        const saved = structuredClone(record);
-
-        if (resource === 'items') {
-          updateInventoryStatus(saved);
-        } else if (resource === 'receipts') {
-          const item = records.items.find(entry => entry.id === saved.itemId);
-          if (!item) throw new Error('Choose a valid inventory item.');
-          item.quantity += Number(saved.quantity);
-          if (saved.expiryDate) item.expiry = saved.expiryDate;
-          updateInventoryStatus(item);
-        } else if (resource === 'issuances') {
-          const item = records.items.find(entry => entry.id === saved.itemId);
-          const request = records.requests.find(entry => entry.id === saved.requestId);
-          if (!item || !request || request.status !== 'Approved') throw new Error('Choose an approved request.');
-          if (getRemainingRequestQuantity(request) < Number(saved.quantity) || item.quantity < Number(saved.quantity)) {
-            throw new Error('The issue quantity exceeds the remaining request or available stock.');
-          }
-          item.quantity -= Number(saved.quantity);
-          updateInventoryStatus(item);
-          if (getRemainingRequestQuantity(request) - Number(saved.quantity) <= 0) request.status = 'Issued';
-        }
-        replaceStoredResource(resource, saved);
-        result = saved;
-      } else if (action === 'update-record') {
-        const { resource, recordId, changes } = payload;
-        if (resource === 'items') {
-          const item = records.items.find(entry => entry.id === recordId);
-          if (!item) throw new Error('The inventory item could not be found.');
-          Object.assign(item, changes);
-          updateInventoryStatus(item);
-          result = item;
-        } else if (resource === 'suppliers') {
-          const supplier = records.suppliers.find(entry => entry.id === recordId);
-          if (!supplier) throw new Error('The supplier could not be found.');
-          Object.assign(supplier, changes);
-          result = supplier;
-        } else {
-          throw new Error('The record update is invalid.');
-        }
-      } else if (action === 'update-request-status') {
-        if (window.IMS.currentUser?.role !== 'admin') throw new Error('Only the Supply Office head can review requests.');
-        const request = records.requests.find(entry => entry.id === payload.requestId);
-        if (!request || request.status !== 'Pending') throw new Error('This request is no longer awaiting review.');
-        if (payload.status === 'Approved') {
-          const item = records.items.find(entry => entry.id === request.itemId);
-          if (!item || Number.parseFloat(request.quantity) > item.quantity) {
-            throw new Error('There is not enough stock to approve this request.');
-          }
-        }
-        if (!['Approved', 'Rejected'].includes(payload.status)) throw new Error('Choose a valid request status.');
-        request.status = payload.status;
-        request.reviewedBy = window.IMS.currentUser.name;
-        request.reviewedAt = new Date().toISOString();
-        result = true;
-      } else if (action === 'cancel-request') {
-        const user = window.IMS.currentUser;
-        if (user?.role !== 'end-user') throw new Error('Only the requesting office can cancel this request.');
-        const request = records.requests.find(entry => entry.id === payload.requestId);
-        if (!request) throw new Error('The stock request could not be found.');
-        const isOwner = request.requesterId != null
-          ? String(request.requesterId) === String(user.id)
-          : String(request.office || '').trim().toLowerCase() === String(user.office || '').trim().toLowerCase()
-            && String(request.employeeId || '').trim().toUpperCase() === String(user.employeeId || '').trim().toUpperCase();
-        if (!isOwner) throw new Error('You can only cancel requests submitted by your account.');
-        if (String(request.status || 'Pending').toLowerCase() !== 'pending') {
-          throw new Error('Only pending requests can be cancelled.');
-        }
-        request.status = 'Cancelled';
-        request.cancelledAt = new Date().toISOString();
-        request.cancelledBy = user.id;
-        result = true;
-      } else {
-        throw new Error('Unknown action.');
-      }
-      persistRecords();
+      const response = await apiRequest('/api/records/mutation', jsonRequest('POST', { action, payload }));
+      replaceRecords(response.records);
       window.dispatchEvent(new CustomEvent('ims:records-updated'));
-      return result;
+      return response.record || true;
     } catch (error) {
-      console.error('Local record operation failed.', error);
+      console.error('Database record operation failed.', error);
       window.IMS.showToast(error.message || 'The record could not be saved.');
       return null;
     }
@@ -572,7 +469,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     filter?.dispatchEvent(new Event('input', { bubbles: true }));
     const idConfig = {
       'stock_request.html': ['#requestForm input[name="requestId"]', 'request'],
-      'suppliers.html': ['#supplierForm input[readonly]', 'suppliers', 'SUP-', 3]
+      'suppliers.html': ['#supplierForm input[readonly]', 'suppliers', 'SUP-', 0]
     }[currentPage];
     if (idConfig) {
       const idField = document.querySelector(idConfig[0]);

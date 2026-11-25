@@ -39,7 +39,6 @@ window.IMS.pageFeatures.push(() => {
   const categoryModal = document.querySelector('#addCategoryModal');
   const categoryForm = document.querySelector('#addCategoryForm');
   const categoryNameInput = document.querySelector('#categoryName');
-  const categoryStorageKey = 'cbsuaSupplyCategories';
   let savedCategories = [];
   let categoryModalOpener = null;
   const supplierSelect = document.querySelectorAll('#addItemForm select')[1];
@@ -74,18 +73,8 @@ window.IMS.pageFeatures.push(() => {
     [...categoryFilter.options].slice(1).forEach(option => {
       option.value = getCategoryName(option);
     });
-    try {
-      const categories = JSON.parse(localStorage.getItem(categoryStorageKey) || '[]');
-      if (!Array.isArray(categories) || categories.some(category =>
-        !category || typeof category.id !== 'string' || typeof category.name !== 'string')) {
-        throw new Error('Saved item categories have an invalid format.');
-      }
-      savedCategories = categories;
-      savedCategories.forEach(addCategoryOption);
-    } catch (error) {
-      console.error('Item categories could not be loaded.', error);
-      window.IMS.showToast('Saved item categories could not be loaded.');
-    }
+    savedCategories = getLocalRecords('categories');
+    savedCategories.forEach(addCategoryOption);
   }
 
   function validateCategoryName() {
@@ -467,38 +456,22 @@ window.IMS.pageFeatures.push(() => {
       closeCategoryModal();
     });
   });
-  categoryModal.addEventListener('click', event => {
-    if (event.target === categoryModal) closeCategoryModal();
-  });
   categoryNameInput.addEventListener('input', validateCategoryName);
-  categoryForm.addEventListener('submit', event => {
+  categoryForm.addEventListener('submit', async event => {
     event.preventDefault();
     event.stopPropagation();
     if (!validateCategoryName() || !categoryForm.reportValidity()) return;
 
     const name = categoryNameInput.value.trim();
-    const categoryNumber = Math.max(0, ...[...categorySelect.options].map(option =>
-      Number(option.textContent.match(/^CAT-(\d+)/)?.[1]) || 0)) + 1;
-    const category = { id: `CAT-${String(categoryNumber).padStart(3, '0')}`, name };
-    try {
-      localStorage.setItem(categoryStorageKey, JSON.stringify([...savedCategories, category]));
-    } catch (error) {
-      console.error('The item category could not be saved.', error);
-      window.IMS.showToast('The item category could not be saved in this browser.');
-      return;
-    }
-
-    savedCategories.push(category);
+    const category = await window.IMS.saveRecord('categories', { name });
+    if (!category) return;
+    loadCategories();
     addCategoryOption(category);
     categorySelect.value = name;
     closeCategoryModal();
     window.IMS.showToast(`${name} added successfully.`);
   });
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !categoryModal.classList.contains('hidden')) {
-      closeCategoryModal();
-    }
-  });
+  window.addEventListener('ims:records-updated', loadCategories);
   refreshSuppliers();
   update();
   refreshMovementChart();

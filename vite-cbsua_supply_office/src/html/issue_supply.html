@@ -86,7 +86,11 @@
           </div>
           <div class="flex flex-wrap justify-end gap-2">
             <button type="button" data-issue-document="form" class="px-3 py-2 border border-cbsua-border rounded-lg text-sm font-medium hover:bg-gray-50" disabled>Print official form</button>
-            <button type="button" data-issue-document="qr" class="px-3 py-2 bg-cbsua-primary text-white rounded-lg text-sm font-medium hover:bg-green-700" disabled>Export QR codes</button>
+            <label id="issuedAssetQrLabel" hidden>
+              <span class="mr-2 text-sm text-cbsua-muted">Issued asset QR:</span>
+              <select id="issuedAssetQr" class="rounded-lg border border-cbsua-border px-3 py-2 text-sm" aria-label="Select an issued asset for QR export"></select>
+            </label>
+            <button type="button" data-issue-document="qr" class="px-3 py-2 bg-cbsua-primary text-white rounded-lg text-sm font-medium hover:bg-green-700" hidden disabled>Export item QR</button>
           </div>
         </div>
       </div>

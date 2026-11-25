@@ -14,7 +14,13 @@ window.IMS.pageFeatures.push(() => {
   const adminCardList = document.querySelector('#adminRequestCardList');
   const adminCardSummary = document.querySelector('#adminRequestCardSummary');
   const requestTableCard = document.querySelector('#requestTableCard');
+  const requestForm = document.querySelector('#requestForm');
   const isAdmin = window.IMS.currentUser?.role === 'admin';
+  const requestClassifications = {
+    consumable: { label: 'Consumable', itemClassification: 'consumable' },
+    'semi-expendable': { label: 'Semi-expendable', itemClassification: 'semi-expendable' },
+    'fixed-asset': { label: 'Fixed Asset', itemClassification: 'fixed asset' }
+  };
   let statusFilter = '';
 
   function formatOfficeOptions(select) {
@@ -35,8 +41,11 @@ window.IMS.pageFeatures.push(() => {
   function refreshRequestForm() {
     if (itemSelect) {
       const previousValue = itemSelect.value;
+      const selectedClassification = requestClassifications[requestForm?.dataset.supplyClassification];
+      const items = getLocalRecords('items').filter(item => !selectedClassification
+        || String(item.supplyClassification || '').trim().toLowerCase() === selectedClassification.itemClassification);
       itemSelect.replaceChildren();
-      getLocalRecords('items').forEach(item => {
+      items.forEach(item => {
         const option = document.createElement('option');
         option.value = item.id;
         option.textContent = `${item.id} — ${item.name} (${item.quantity} ${item.unit} available)`;
@@ -49,10 +58,12 @@ window.IMS.pageFeatures.push(() => {
       } else {
         const option = document.createElement('option');
         option.value = '';
-        option.textContent = 'No inventory items available';
+        option.textContent = selectedClassification
+          ? `No ${selectedClassification.label} items available`
+          : 'No inventory items available';
         itemSelect.append(option);
       }
-      itemSelect.disabled = itemSelect.options.length === 1 && !itemSelect.value;
+      itemSelect.disabled = items.length === 0;
     }
     if (idField) idField.value = nextRequestId();
   }
@@ -253,6 +264,7 @@ window.IMS.pageFeatures.push(() => {
     refreshRequestForm();
     update();
   });
+  window.addEventListener('ims:request-classification-changed', refreshRequestForm);
   refreshRequestForm();
   update();
 });

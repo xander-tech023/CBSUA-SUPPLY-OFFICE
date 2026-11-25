@@ -31,6 +31,8 @@ window.IMS.pageFeatures.push(() => {
   };
   const officialFormButton = document.querySelector('[data-issue-document="form"]');
   const assetQrButton = document.querySelector('[data-issue-document="qr"]');
+  const assetQrSelect = document.getElementById('issuedAssetQr');
+  const assetQrSelectLabel = document.getElementById('issuedAssetQrLabel');
   const officialFormNames = {
     RIS: 'Requisition and Issue Slip',
     ICS: 'Inventory Custodian Slip',
@@ -46,7 +48,7 @@ window.IMS.pageFeatures.push(() => {
   printDocument.className = 'ims-print-document';
   printDocument.hidden = true;
   document.body.append(printDocument);
-  if (assetQrButton) assetQrButton.disabled = !getIssuedAssetQrRecords().length;
+  refreshAssetQrOptions(true);
   const today = new Date();
   today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
   form.querySelector('#issueDate').value = today.toISOString().slice(0, 10);
@@ -93,7 +95,11 @@ window.IMS.pageFeatures.push(() => {
     officeInput.value = selectedRequest.office;
     recipientInput.value = selectedRequest.recipient;
     recipientIdInput.value = selectedRequest.employeeId || 'Not recorded for this request';
-    if (audit.reference) audit.reference.textContent = window.IMS.nextRecordId('issuances', 'ISS-2026-', 20);
+    if (audit.reference) {
+      audit.reference.textContent = window.IMS.nextRecordId(
+        'issuances', `ISS-${new Date().getFullYear()}-`, 0
+      );
+    }
     if (audit.request) audit.request.textContent = selectedRequest.id;
     if (audit.recipient) audit.recipient.textContent = selectedRequest.employeeId
       ? `${selectedRequest.recipient} · ${selectedRequest.employeeId}`
@@ -171,6 +177,9 @@ window.IMS.pageFeatures.push(() => {
       const item = items.get(issuance.itemId);
       const documentType = String(request?.documentType || '').toUpperCase();
       if (!request || !item || !['ICS', 'PAR'].includes(documentType)) return null;
+      const classification = String(request.supplyClassification || '').trim().toLowerCase().replace(/\s+/g, '-');
+      if ((documentType === 'ICS' && classification !== 'semi-expendable')
+        || (documentType === 'PAR' && classification !== 'fixed-asset')) return null;
 
       const details = request.classificationDetails || {};
       const specifications = [...new Set([details.specifications, item.description]
@@ -202,51 +211,69 @@ window.IMS.pageFeatures.push(() => {
     }).filter(Boolean);
   }
 
+  function refreshAssetQrOptions(preferLatest = false) {
+    if (!assetQrSelect || !assetQrButton) return;
+    const records = getIssuedAssetQrRecords();
+    const previousValue = assetQrSelect.value;
+    assetQrSelect.replaceChildren();
+    records.forEach(asset => {
+      const option = document.createElement('option');
+      option.value = asset.issuanceReference;
+      option.textContent = `${asset.documentType} · ${asset.itemName} (${asset.itemCode}) · ${asset.issuanceReference}`;
+      assetQrSelect.append(option);
+    });
+    const preferredValue = preferLatest ? lastIssuance?.id : previousValue;
+    if (records.length) {
+      assetQrSelect.value = records.some(asset => asset.issuanceReference === preferredValue)
+        ? preferredValue
+        : records[0].issuanceReference;
+    }
+    if (assetQrSelectLabel) assetQrSelectLabel.hidden = records.length < 2;
+    assetQrButton.hidden = records.length === 0;
+    assetQrButton.disabled = records.length === 0;
+  }
+
   async function exportAssetQrCodes() {
     const records = getIssuedAssetQrRecords();
-    if (!records.length) {
-      showToast('There are no issued ICS or PAR assets to export QR codes for.');
+    const asset = records.find(record => record.issuanceReference === assetQrSelect?.value);
+    if (!asset) {
+      showToast('Select an issued Semi-expendable or Fixed Asset item to export its QR code.');
       return;
     }
     if (!window.QRCode) throw new Error('The QR code generator did not load. Check your internet connection and reload.');
 
-    const recordsWithLinks = await Promise.all(records.map(async asset => {
-      const response = await fetch('/api/scanner-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appUrl: location.origin, asset })
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || `Scanner API returned ${response.status}.`);
-      return { asset, url: result.url };
-    }));
+    const response = await fetch('/api/scanner-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appUrl: location.origin, asset })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || `Scanner API returned ${response.status}.`);
 
     printDocument.replaceChildren();
     printDocument.className = 'ims-print-document ims-print-asset-document';
-    recordsWithLinks.forEach(({ asset, url }) => {
-      const label = makeTextElement('section', 'ims-print-asset-label', '');
-      const heading = makeTextElement('header', 'ims-print-asset-heading', '');
-      heading.append(
-        makeTextElement('p', '', `${asset.documentType} · ${asset.classification}`),
-        makeTextElement('h2', '', asset.itemName),
-        makeTextElement('p', '', `${asset.itemCode} · ${asset.issuanceReference}`)
-      );
-      const qr = makeTextElement('div', 'ims-print-asset-qr', '');
-      qr.setAttribute('aria-label', `QR code for ${asset.itemName}`);
-      new window.QRCode(qr, {
-        text: url,
-        width: 180,
-        height: 180,
-        correctLevel: window.QRCode.CorrectLevel.M
-      });
-      const info = makeTextElement('p', 'ims-print-asset-info', [
-        asset.propertyNumber && `Property No.: ${asset.propertyNumber}`,
-        asset.quantity && `Quantity: ${asset.quantity} ${asset.unit}`.trim(),
-        asset.issuedOn && `Issued: ${asset.issuedOn}`
-      ].filter(Boolean).join(' · '));
-      label.append(heading, qr, info);
-      printDocument.append(label);
+    const label = makeTextElement('section', 'ims-print-asset-label', '');
+    const heading = makeTextElement('header', 'ims-print-asset-heading', '');
+    heading.append(
+      makeTextElement('p', '', `${asset.documentType} · ${asset.classification}`),
+      makeTextElement('h2', '', asset.itemName),
+      makeTextElement('p', '', `${asset.itemCode} · ${asset.issuanceReference}`)
+    );
+    const qr = makeTextElement('div', 'ims-print-asset-qr', '');
+    qr.setAttribute('aria-label', `QR code for ${asset.itemName}`);
+    new window.QRCode(qr, {
+      text: result.url,
+      width: 240,
+      height: 240,
+      correctLevel: window.QRCode.CorrectLevel.M
     });
+    const info = makeTextElement('p', 'ims-print-asset-info', [
+      asset.propertyNumber && `Property No.: ${asset.propertyNumber}`,
+      asset.quantity && `Quantity: ${asset.quantity} ${asset.unit}`.trim(),
+      asset.issuedOn && `Issued: ${asset.issuedOn}`
+    ].filter(Boolean).join(' · '));
+    label.append(heading, qr, info);
+    printDocument.append(label);
 
     const originalTitle = document.title;
     document.title = 'CBSUA-Asset-QR-Codes';
@@ -641,17 +668,17 @@ window.IMS.pageFeatures.push(() => {
         return;
       }
       const requesterById = request.requesterId
-        ? window.IMS.accounts.findAccountById(request.requesterId)
+        ? await window.IMS.accounts.findAccountById(request.requesterId)
         : null;
       requestingAccount = requesterById?.role === 'end-user'
         ? requesterById
-        : window.IMS.accounts.findEndUserByName(request.recipient, request.office);
+        : await window.IMS.accounts.findEndUserByName(request.recipient, request.office);
       requestedBy = requestingAccount?.name || request.recipient || requesterById?.name || '—';
       const requesterIsOfficeHead = requestingAccount?.title && /\bhead\b/i.test(requestingAccount.title);
       approvedBy = requesterIsOfficeHead
         ? requestedBy
         : 'Atty. Engr. Arch. Emerson P. Elopre';
-      supplyOfficeHead = window.IMS.accounts.getSupplyOfficeHead();
+      supplyOfficeHead = await window.IMS.accounts.getSupplyOfficeHead();
       if (!supplyOfficeHead?.name) {
         showToast('The Head of Supply Office account is not configured.');
         return;
@@ -806,13 +833,13 @@ window.IMS.pageFeatures.push(() => {
   });
   window.addEventListener('ims:issuance-saved', event => {
     lastIssuance = event.detail;
-    if (assetQrButton) assetQrButton.disabled = !getIssuedAssetQrRecords().length;
+    refreshAssetQrOptions(true);
   });
   requestSelect.addEventListener('change', () => updatePreview(true));
   quantityInput.addEventListener('input', () => updatePreview());
   window.addEventListener('ims:records-updated', refreshRequests);
   window.addEventListener('ims:records-updated', () => {
-    if (assetQrButton) assetQrButton.disabled = !getIssuedAssetQrRecords().length;
+    refreshAssetQrOptions();
   });
   refreshRequests();
 });

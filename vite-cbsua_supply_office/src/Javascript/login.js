@@ -53,14 +53,23 @@ export function initializeLogin() {
     }
   }
 
-  function renderResetStatus() {
+  async function renderResetStatus() {
     const username = localStorage.getItem(lastResetUsernameKey);
     if (!username) {
       showResetPassword.textContent = 'Change password';
       showResetPassword.disabled = false;
       return;
     }
-    const latestRequest = window.IMS.accounts.readPasswordResetRequests()
+    let requests;
+    try {
+      requests = await window.IMS.accounts.getPasswordResetRequests(username);
+    } catch (error) {
+      console.error('Password reset status could not be loaded.', error);
+      showResetPassword.textContent = 'Reset status unavailable';
+      showResetPassword.disabled = false;
+      return;
+    }
+    const latestRequest = requests
       .filter(request => request.username === username && ['staff', 'end-user'].includes(request.role))
       .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt))[0];
     if (!latestRequest) {
@@ -89,15 +98,27 @@ export function initializeLogin() {
     if (requesting) document.getElementById('resetUsername')?.focus();
   }
 
-  showResetPassword?.addEventListener('click', () => {
+  showResetPassword?.addEventListener('click', async () => {
     const username = localStorage.getItem(lastResetUsernameKey);
-    const approved = username && window.IMS.accounts.readPasswordResetRequests().some(request =>
-      request.username === username
-      && ['staff', 'end-user'].includes(request.role)
-      && request.status === 'Approved'
-    );
-    if (approved) setChangePasswordMode(true, username);
-    else setResetPasswordMode(true);
+    if (username) {
+      try {
+        const requests = await window.IMS.accounts.getPasswordResetRequests(username);
+        const approved = requests.some(request =>
+          request.username === username
+          && ['staff', 'end-user'].includes(request.role)
+          && request.status === 'Approved'
+        );
+        if (approved) {
+          setChangePasswordMode(true, username);
+          return;
+        }
+      } catch (error) {
+        resetPasswordRequestErr.textContent = error.message || 'Password reset status could not be checked.';
+        resetPasswordRequestErr.classList.remove('hidden');
+        return;
+      }
+    }
+    setResetPasswordMode(true);
   });
   cancelResetPassword?.addEventListener('click', () => setResetPasswordMode(false));
 
@@ -110,13 +131,13 @@ export function initializeLogin() {
     }
     const username = document.getElementById('resetUsername').value.trim();
     window.IMS.accounts.requestPasswordReset(username)
-      .then(() => {
+      .then(async () => {
         localStorage.setItem(lastResetUsernameKey, username.toLowerCase());
         resetPasswordRequestForm.reset();
         registrationSuccess.textContent = 'Password change request sent to the administrator for approval.';
         registrationSuccess.classList.remove('hidden');
         setResetPasswordMode(false);
-        renderResetStatus();
+        await renderResetStatus();
       })
       .catch(error => {
         resetPasswordRequestErr.textContent = error.message || 'The password change request could not be submitted.';
@@ -245,8 +266,5 @@ export function initializeLogin() {
   });
 
   window.addEventListener('ims:password-reset-updated', renderResetStatus);
-  window.addEventListener('storage', event => {
-    if (event.key === 'cbsuaSupplyPasswordResetRequests') renderResetStatus();
-  });
   renderResetStatus();
 }

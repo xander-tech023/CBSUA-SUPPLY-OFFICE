@@ -1,133 +1,65 @@
+import { apiRequest, jsonRequest } from './api-client.js';
+
 window.IMS = window.IMS || {};
 
 (() => {
-  const sessionKey = 'cbsuaSupplySession';
-  const registeredAccountsKey = 'cbsuaSupplyAccounts';
-  const passwordOverridesKey = 'cbsuaSupplyPasswordOverrides';
-  const passwordResetRequestsKey = 'cbsuaSupplyPasswordResetRequests';
-  const accounts = {
-    admin: {
-      id: 1,
-      username: 'admin',
-      password: 'admin123',
-      name: 'Renjene D.S. Rivera',
-      title: 'Head, Supply Office',
-      role: 'admin'
-    },
-    staff: {
-      id: 2,
-      username: 'staff',
-      password: 'staff123',
-      name: 'Maria Santos',
-      title: 'Supply Staff Officer',
-      role: 'staff'
-    }
-  };
-
   const officeNames = [
-    "Accounting Office",
-    "Admission Office",
-    "Alumni Office",
-    "Auxiliary Office",
-    "Budget Office",
-    "Bids and Awards Committee Office",
-    "Business Affairs Unit",
-    "Campus PIO",
+    'Accounting Office',
+    'Admission Office',
+    'Alumni Office',
+    'Auxiliary Office',
+    'Budget Office',
+    'Bids and Awards Committee Office',
+    'Business Affairs Unit',
+    'Campus PIO',
     "Cashier's Office",
-    "College of Engineering",
-    "College of Information Technology",
-    "Clinic / Infirmary",
-    "College of Criminology",
-    "College of Education",
-    "Commission on Audit",
-    "College of Industrial Technology",
-    "Curriculum and Instruction Division",
-    "Disaster Risk Readiness Management Office",
-    "Environmental Science and Agroforestry Program",
-    "Extension Services Unit",
-    "Gender and Development Office",
-    "General Administration and Support Services",
-    "Guidance and Counseling Unit",
-    "Human Resource Management Office",
-    "Informations and Communications Technology Office",
-    "Industry Linkages and Development Office",
-    "Institutional Planning and Development Office",
-    "Library",
-    "Motorpool",
-    "Office of Campus Administrator",
-    "Office of the Student Affairs and Services",
-    "Physical Plant and Development Office",
-    "Publication Office",
-    "Quality Assurance Office",
-    "Reading Center",
+    'College of Engineering',
+    'College of Information Technology',
+    'Clinic / Infirmary',
+    'College of Criminology',
+    'College of Education',
+    'Commission on Audit',
+    'College of Industrial Technology',
+    'Curriculum and Instruction Division',
+    'Disaster Risk Readiness Management Office',
+    'Environmental Science and Agroforestry Program',
+    'Extension Services Unit',
+    'Gender and Development Office',
+    'General Administration and Support Services',
+    'Guidance and Counseling Unit',
+    'Human Resource Management Office',
+    'Informations and Communications Technology Office',
+    'Industry Linkages and Development Office',
+    'Institutional Planning and Development Office',
+    'Library',
+    'Motorpool',
+    'Office of Campus Administrator',
+    'Office of the Student Affairs and Services',
+    'Physical Plant and Development Office',
+    'Publication Office',
+    'Quality Assurance Office',
+    'Reading Center',
     "Record's Office",
     "Registrar's Office",
-    "Research and Development Center",
-    "ROTC / NSTP Office",
-    "Sentro ng Wika, Kultura at Sining",
-    "Supply Office",
-    "UMIS"
+    'Research and Development Center',
+    'ROTC / NSTP Office',
+    'Sentro ng Wika, Kultura at Sining',
+    'Supply Office',
+    'UMIS'
   ];
+  let passwordResetRequests = [];
 
   function getOfficeId(officeName) {
-    const index = officeNames.findIndex(name => name.toLowerCase() === String(officeName || '').trim().toLowerCase());
+    const index = officeNames.findIndex(name =>
+      name.toLowerCase() === String(officeName || '').trim().toLowerCase());
     return index >= 0 ? `OFF-${String(index + 1).padStart(3, '0')}` : '';
-  }
-
-  function readSession() {
-    try {
-      return JSON.parse(sessionStorage.getItem(sessionKey) || localStorage.getItem(sessionKey) || 'null');
-    } catch {
-      return null;
-    }
-  }
-
-  function readRegisteredAccounts() {
-    try {
-      return JSON.parse(localStorage.getItem(registeredAccountsKey) || '[]');
-    } catch {
-      return [];
-    }
-  }
-
-  function readPasswordOverrides() {
-    try {
-      return JSON.parse(localStorage.getItem(passwordOverridesKey) || '{}');
-    } catch {
-      return {};
-    }
-  }
-
-  function readPasswordResetRequests() {
-    try {
-      return JSON.parse(localStorage.getItem(passwordResetRequestsKey) || '[]');
-    } catch {
-      return [];
-    }
-  }
-
-  function writePasswordResetRequests(requests) {
-    localStorage.setItem(passwordResetRequestsKey, JSON.stringify(requests));
-  }
-
-  function getAllAccounts() {
-    const overrides = readPasswordOverrides();
-    return [...Object.values(accounts).map(account => ({
-      ...account,
-      password: account.role === 'admin'
-        ? account.password
-        : overrides[account.username.toLowerCase()] || account.password
-    })), ...readRegisteredAccounts()];
-  }
-
-  function canResetPassword(account) {
-    return account?.role === 'staff' || account?.role === 'end-user';
   }
 
   function validatePassword(password) {
     return typeof password === 'string'
       && password.length >= 8
       && password.length <= 64
+      && new TextEncoder().encode(password).length <= 72
       && /[A-Za-z]/.test(password)
       && /\d/.test(password);
   }
@@ -160,8 +92,8 @@ window.IMS = window.IMS || {};
       || (middleName && !/^[A-Za-zÑñ .'-]{1,40}$/.test(middleName))) {
       throw new Error('Enter valid names using letters, spaces, apostrophes, periods, or hyphens.');
     }
-    if (position.length < 2 || position.length > 80) {
-      throw new Error('Employee position must be 2-80 characters.');
+    if (position.length < 2 || position.length > 100) {
+      throw new Error('Employee position must be 2-100 characters.');
     }
     if (!officeNames.includes(office)) throw new Error('Select a valid office.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a valid institutional email address.');
@@ -169,257 +101,115 @@ window.IMS = window.IMS || {};
       throw new Error('Password must be 8-64 characters and contain at least one letter and one number.');
     }
     return {
-      id: Date.now(),
-      username,
-      password,
-      name: [firstName, middleName, surname].filter(Boolean).join(' '),
+      firstName,
+      middleName,
+      surname,
       employeeId,
-      title: position,
+      username,
+      position,
       office,
-      officeId: getOfficeId(office),
       email,
-      role: 'end-user'
+      password,
+      acceptedTerms: registration.acceptedTerms === true
     };
   }
 
-  function findAccount(username) {
-    const normalized = String(username || '').trim().toLowerCase();
-    return getAllAccounts().find(account => account.username.toLowerCase() === normalized) || null;
+  async function getPasswordResetRequests(username = '') {
+    const query = username ? `?username=${encodeURIComponent(username)}` : '';
+    const { requests } = await apiRequest(`/api/password-resets${query}`);
+    if (!username) passwordResetRequests = requests;
+    return requests;
   }
 
-  function getPublicProfile(account) {
-    if (!account) return null;
-    const { id, username, name, title, role, employeeId, office, email } = account;
-    return { id, username, name, title, role, employeeId: employeeId || '', office: office || '', email: email || '' };
-  }
-
-  function findAccountById(id) {
-    const account = getAllAccounts().find(candidate => String(candidate.id) === String(id));
-    return getPublicProfile(account);
-  }
-
-  function findEndUserByName(name, office) {
-    const normalizedName = String(name || '').trim().toLowerCase();
-    const normalizedOffice = String(office || '').trim().toLowerCase();
-    const account = getAllAccounts().find(candidate =>
-      candidate.role === 'end-user'
-      && candidate.name?.trim().toLowerCase() === normalizedName
-      && (!normalizedOffice || candidate.office?.trim().toLowerCase() === normalizedOffice)
-    );
-    return getPublicProfile(account);
-  }
-
-  function getSupplyOfficeHead() {
-    const account = getAllAccounts().find(candidate =>
-      candidate.role === 'admin'
-      && /\bhead\b/i.test(candidate.title || '')
-      && /supply office/i.test(`${candidate.title || ''} ${candidate.office || ''}`)
-    );
-    return getPublicProfile(account);
-  }
-
-  function writeRegisteredAccount(account) {
-    const registeredAccounts = readRegisteredAccounts();
-    const existingAccounts = [...registeredAccounts, ...Object.values(accounts)];
-    const duplicate = existingAccounts.some(
-      existing => existing.username.toLowerCase() === account.username.toLowerCase()
-    );
-    if (duplicate) throw new Error('That username is already registered.');
-    if (existingAccounts.some(existing =>
-      existing.employeeId
-      && existing.employeeId.toLowerCase() === account.employeeId.toLowerCase()
-    )) {
-      throw new Error('An account already exists for that employee ID.');
-    }
-    while (existingAccounts.some(existing => String(existing.id) === String(account.id))) {
-      account.id += 1;
-    }
-    registeredAccounts.push(account);
-    localStorage.setItem(registeredAccountsKey, JSON.stringify(registeredAccounts));
-  }
-
-  function saveAccountPassword(account, password) {
-    const normalizedUsername = account.username.toLowerCase();
-    if (Object.values(accounts).some(item => item.username.toLowerCase() === normalizedUsername)) {
-      const overrides = readPasswordOverrides();
-      overrides[normalizedUsername] = password;
-      localStorage.setItem(passwordOverridesKey, JSON.stringify(overrides));
-      return;
-    }
-    const registeredAccounts = readRegisteredAccounts();
-    const registeredAccount = registeredAccounts.find(
-      item => item.username.toLowerCase() === normalizedUsername
-    );
-    if (!registeredAccount) throw new Error('No account was found with that username.');
-    registeredAccount.password = password;
-    localStorage.setItem(registeredAccountsKey, JSON.stringify(registeredAccounts));
+  async function refreshAdminPasswordResetRequests() {
+    passwordResetRequests = await getPasswordResetRequests();
+    window.dispatchEvent(new CustomEvent('ims:password-reset-updated'));
   }
 
   window.IMS.accounts = {
+    async initialize(user) {
+      if (user?.role === 'admin') await refreshAdminPasswordResetRequests();
+    },
     async login(role, username, password, remember) {
-      const normalizedUsername = String(username || '').trim().toLowerCase();
-      const account = getAllAccounts().find(
-        candidate => candidate.username.toLowerCase() === normalizedUsername
-      );
-      if (!account || account.password !== password) {
-        throw new Error('Username or password is incorrect for the selected workspace.');
-      }
-      const user = {
-        id: account.id,
-        username: account.username,
-        name: account.name,
-        title: account.title,
-        role: account.role,
-        employeeId: account.employeeId || '',
-        office: account.office || '',
-        officeId: account.officeId || getOfficeId(account.office),
-        email: account.email || ''
-      };
-      sessionStorage.setItem(sessionKey, JSON.stringify(user));
-      if (remember) {
-        localStorage.setItem(sessionKey, JSON.stringify(user));
-      } else {
-        localStorage.removeItem(sessionKey);
-      }
-      return { ok: true, user };
+      return apiRequest('/api/auth/login', jsonRequest('POST', {
+        username: String(username || '').trim().toLowerCase(),
+        password,
+        remember: remember === true
+      }));
     },
     async register(registration) {
-      if (!registration.acceptedTerms) {
-        throw new Error('You must accept the Terms and Conditions to create an account.');
-      }
       const account = normalizeRegistration(registration);
-      writeRegisteredAccount(account);
-      return { ok: true, account };
+      return apiRequest('/api/auth/register', jsonRequest('POST', account));
     },
     async updateEmployeeId(username, employeeId) {
-      const normalizedUsername = String(username || '').trim().toLowerCase();
       const normalizedEmployeeId = String(employeeId || '').trim().toUpperCase();
       if (!/^[A-Z0-9-]{3,24}$/.test(normalizedEmployeeId)) {
-        throw new Error('Enter an employee ID using 3–24 letters, numbers, or hyphens.');
+        throw new Error('Enter an employee ID using 3-24 letters, numbers, or hyphens.');
       }
-      const registeredAccounts = readRegisteredAccounts();
-      const duplicate = [...registeredAccounts, ...Object.values(accounts)].some(account =>
-        account.username.toLowerCase() !== normalizedUsername
-        && String(account.employeeId || '').trim().toUpperCase() === normalizedEmployeeId
-      );
-      if (duplicate) throw new Error('That employee ID is already used by another account.');
-      const account = registeredAccounts.find(entry => entry.username.toLowerCase() === normalizedUsername);
-      if (!account) throw new Error('Only registered end-user accounts can update their employee ID here.');
-      account.employeeId = normalizedEmployeeId;
-      localStorage.setItem(registeredAccountsKey, JSON.stringify(registeredAccounts));
-      const session = readSession();
-      if (session?.username?.toLowerCase() === normalizedUsername) {
-        session.employeeId = normalizedEmployeeId;
-        sessionStorage.setItem(sessionKey, JSON.stringify(session));
-        if (localStorage.getItem(sessionKey)) localStorage.setItem(sessionKey, JSON.stringify(session));
-        window.IMS.currentUser = session;
+      const result = await apiRequest('/api/accounts/me/employee-id',
+        jsonRequest('PUT', { employeeId: normalizedEmployeeId }));
+      if (window.IMS.currentUser) {
+        window.IMS.currentUser.employeeId = result.employeeId;
       }
-      return { ok: true, employeeId: normalizedEmployeeId };
+      return result;
     },
     async requestPasswordReset(username) {
-      const account = findAccount(username);
-      if (!account) throw new Error('No account was found with that username.');
-      if (!canResetPassword(account)) {
-        throw new Error('Password resets are available only for staff and end-user accounts.');
-      }
-      const normalizedUsername = account.username.toLowerCase();
-      const requests = readPasswordResetRequests();
-      if (requests.some(request => request.username === normalizedUsername
-        && ['Pending', 'Approved'].includes(request.status))) {
-        throw new Error('A password reset request is already active for this account.');
-      }
-      const request = {
-        id: `RESET-${Date.now()}`,
-        username: normalizedUsername,
-        accountName: account.name,
-        role: account.role,
-        status: 'Pending',
-        requestedAt: new Date().toISOString()
-      };
-      requests.unshift(request);
-      writePasswordResetRequests(requests);
+      const result = await apiRequest('/api/password-resets', jsonRequest('POST', {
+        username: String(username || '').trim().toLowerCase()
+      }));
       window.dispatchEvent(new CustomEvent('ims:password-reset-updated'));
-      return { ok: true, request };
+      return result;
     },
     async resetPassword(username, password) {
-      const account = findAccount(username);
-      if (!account) throw new Error('No account was found with that username.');
-      if (!canResetPassword(account)) {
-        throw new Error('Only staff and end-user passwords can be reset.');
-      }
-      if (!validatePassword(password)) {
-        throw new Error('Password must be 8-64 characters and contain at least one letter and one number.');
-      }
-      const normalizedUsername = account.username.toLowerCase();
-      const requests = readPasswordResetRequests();
-      const approvedRequest = requests.find(request =>
-        request.username === normalizedUsername && request.status === 'Approved'
-      );
-      if (!approvedRequest) throw new Error('This password reset request has not been approved.');
-      saveAccountPassword(account, password);
-      requests.forEach(request => {
-        if (request.username === normalizedUsername && request.status === 'Approved') {
-          request.status = 'Completed';
-          request.completedAt = new Date().toISOString();
-        }
-      });
-      writePasswordResetRequests(requests);
+      const result = await apiRequest('/api/password-resets/complete', jsonRequest('POST', {
+        username: String(username || '').trim().toLowerCase(),
+        password
+      }));
       window.dispatchEvent(new CustomEvent('ims:password-reset-updated'));
-      return { ok: true };
+      return result;
     },
     async approvePasswordReset(requestId) {
       if (window.IMS.currentUser?.role !== 'admin') {
         throw new Error('Only an administrator can approve password reset requests.');
       }
-      const requests = readPasswordResetRequests();
-      const request = requests.find(entry => entry.id === requestId);
-      if (!request || request.status !== 'Pending') throw new Error('This password reset request is no longer pending.');
-      if (!canResetPassword(findAccount(request.username))) {
-        throw new Error('Only staff and end-user passwords can be reset.');
-      }
-      request.status = 'Approved';
-      request.approvedAt = new Date().toISOString();
-      writePasswordResetRequests(requests);
-      window.dispatchEvent(new CustomEvent('ims:password-reset-updated'));
-      return { ok: true, request };
+      const result = await apiRequest(`/api/password-resets/${encodeURIComponent(requestId)}/review`,
+        jsonRequest('POST', { status: 'Approved' }));
+      await refreshAdminPasswordResetRequests();
+      return result;
     },
     async rejectPasswordReset(requestId) {
       if (window.IMS.currentUser?.role !== 'admin') {
         throw new Error('Only an administrator can reject password reset requests.');
       }
-      const requests = readPasswordResetRequests();
-      const request = requests.find(entry => entry.id === requestId);
-      if (!request || request.status !== 'Pending') throw new Error('This password reset request is no longer pending.');
-      request.status = 'Rejected';
-      request.rejectedAt = new Date().toISOString();
-      writePasswordResetRequests(requests);
-      window.dispatchEvent(new CustomEvent('ims:password-reset-updated'));
-      return { ok: true, request };
+      const result = await apiRequest(`/api/password-resets/${encodeURIComponent(requestId)}/review`,
+        jsonRequest('POST', { status: 'Rejected' }));
+      await refreshAdminPasswordResetRequests();
+      return result;
     },
-    readPasswordResetRequests,
+    readPasswordResetRequests() {
+      return [...passwordResetRequests];
+    },
+    getPasswordResetRequests,
     getOfficeId,
-    findAccountById,
-    findEndUserByName,
-    getSupplyOfficeHead,
+    async findAccountById(id) {
+      const { account } = await apiRequest(`/api/accounts/${encodeURIComponent(id)}`);
+      return account;
+    },
+    async findEndUserByName(name, office) {
+      const params = new URLSearchParams({ name: String(name || '').trim(), office: String(office || '').trim() });
+      const { account } = await apiRequest(`/api/accounts/find?${params}`);
+      return account;
+    },
+    async getSupplyOfficeHead() {
+      const { account } = await apiRequest('/api/accounts/head');
+      return account;
+    },
     async getSession() {
-      const session = readSession();
-      if (!session) return null;
-      const account = [...Object.values(accounts), ...readRegisteredAccounts()].find(
-        candidate => candidate.username.toLowerCase() === session.username?.toLowerCase()
-      );
-      return account
-        ? {
-          ...session,
-          employeeId: account.employeeId || '',
-          office: account.office || '',
-          email: account.email || ''
-        }
-        : session;
+      const { user } = await apiRequest('/api/auth/session');
+      return user;
     },
     async logout() {
-      sessionStorage.removeItem(sessionKey);
-      localStorage.removeItem(sessionKey);
-      return { ok: true };
+      return apiRequest('/api/auth/logout', { method: 'POST' });
     }
   };
 })();

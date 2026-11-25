@@ -10,6 +10,11 @@ window.IMS.pageFeatures.push(() => {
   const notificationSummary = document.getElementById('userNotificationSummary');
   const notificationList = document.getElementById('userNotificationList');
   const markNotificationsRead = document.getElementById('markNotificationsRead');
+  const requestClassifications = {
+    consumable: { label: 'Consumable', itemClassification: 'consumable' },
+    'semi-expendable': { label: 'Semi-expendable', itemClassification: 'semi-expendable' },
+    'fixed-asset': { label: 'Fixed Asset', itemClassification: 'fixed asset' }
+  };
   let currentRequests = [];
   let currentNotifications = [];
 
@@ -220,6 +225,38 @@ window.IMS.pageFeatures.push(() => {
     }
   }
 
+  function renderRequestItemOptions(items) {
+    if (!itemSelect) return;
+    const previousValue = itemSelect.value;
+    const selectedClassification = requestClassifications[requestForm?.dataset.supplyClassification];
+    const availableItems = items.filter(item => Number(item.quantity) > 0);
+    const selectableItems = availableItems.filter(item => !selectedClassification
+      || String(item.supplyClassification || '').trim().toLowerCase() === selectedClassification.itemClassification);
+    itemSelect.replaceChildren();
+    selectableItems.forEach(item => {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = `${item.name} (${item.quantity} ${item.unit} available)`;
+      itemSelect.append(option);
+    });
+    if (selectableItems.length) {
+      itemSelect.value = selectableItems.some(item => item.id === previousValue)
+        ? previousValue
+        : selectableItems[0].id;
+    } else {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = selectedClassification
+        ? `No ${selectedClassification.label} items currently available`
+        : 'No items currently available';
+      itemSelect.append(option);
+    }
+    itemSelect.disabled = selectableItems.length === 0;
+    const submitButton = requestForm?.querySelector('button[type="submit"]');
+    if (submitButton) submitButton.disabled = selectableItems.length === 0;
+    updateQuantityLimit(selectableItems);
+  }
+
   function renderAvailableItems(items) {
     if (!availableItemList) return;
     const availableItems = items.filter(item => Number(item.quantity) > 0);
@@ -269,30 +306,7 @@ window.IMS.pageFeatures.push(() => {
       });
     }
 
-    if (itemSelect) {
-      const previousValue = itemSelect.value;
-      itemSelect.replaceChildren();
-      availableItems.forEach(item => {
-        const option = document.createElement('option');
-        option.value = item.id;
-        option.textContent = `${item.name} (${item.quantity} ${item.unit} available)`;
-        itemSelect.append(option);
-      });
-      if (availableItems.length) {
-        itemSelect.value = availableItems.some(item => item.id === previousValue)
-          ? previousValue
-          : availableItems[0].id;
-      } else {
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = 'No items currently available';
-        itemSelect.append(option);
-      }
-      itemSelect.disabled = availableItems.length === 0;
-      const submitButton = requestForm?.querySelector('button[type="submit"]');
-      if (submitButton) submitButton.disabled = availableItems.length === 0;
-      updateQuantityLimit(availableItems);
-    }
+    renderRequestItemOptions(items);
   }
 
   function render() {
@@ -411,12 +425,11 @@ window.IMS.pageFeatures.push(() => {
     if (event.key === 'Escape') setNotificationPanelOpen(false);
   });
   window.addEventListener('ims:records-updated', render);
+  window.addEventListener('ims:request-classification-changed', () => {
+    renderRequestItemOptions(window.IMS.getLocalRecords('items'));
+  });
   window.addEventListener('storage', event => {
-    if (event.key === 'cbsuaSupplyRecords') {
-      window.IMS.initializeRecords()
-        .then(() => window.dispatchEvent(new CustomEvent('ims:records-updated')))
-        .catch(error => console.error('Your dashboard could not be refreshed.', error));
-    } else if (event.key?.startsWith('cbsuaSupplyUserNotificationReads:')) {
+    if (event.key?.startsWith('cbsuaSupplyUserNotificationReads:')) {
       renderNotifications(currentRequests);
     }
   });
