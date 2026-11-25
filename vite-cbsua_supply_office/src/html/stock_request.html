@@ -258,11 +258,11 @@
           <span class="mt-1 block text-sm text-cbsua-muted">RIS · Requisition and Issue Slip</span>
         </button>
         <button type="button" data-select-supply-classification="semi-expendable" class="rounded-lg border border-cbsua-border p-4 text-left hover:border-cbsua-primary hover:bg-cbsua-pale">
-          <span class="block font-semibold">Semi Expendable</span>
+          <span class="block font-semibold">Semi-expendable</span>
           <span class="mt-1 block text-sm text-cbsua-muted">ICS · Inventory Custodian Slip</span>
         </button>
         <button type="button" data-select-supply-classification="fixed-asset" class="rounded-lg border border-cbsua-border p-4 text-left hover:border-cbsua-primary hover:bg-cbsua-pale">
-          <span class="block font-semibold">Fixed Asset (PPE)</span>
+          <span class="block font-semibold">Fixed Asset</span>
           <span class="mt-1 block text-sm text-cbsua-muted">PAR · Property Acknowledgment Receipt</span>
         </button>
       </div>
@@ -276,6 +276,7 @@
         <p data-request-form-summary class="font-medium"></p>
         <button type="button" data-change-supply-classification class="shrink-0 text-sm font-medium text-cbsua-primary hover:underline">Change</button>
       </div>
+      <p class="text-sm text-cbsua-muted">Fund Cluster, P.O. No., and IAR Number are generated on submission and shown in the saved request.</p>
         <div>
           <label class="block font-medium mb-2">Requesting office *</label>
           <input id="requestOffice" type="text" class="w-full px-4 py-2.5 border border-cbsua-border rounded-lg bg-gray-50" value="Supply Office" readonly required />
@@ -307,13 +308,6 @@
           <label class="block font-medium mb-2">Purpose / Remarks</label>
           <textarea id="requestRemarks" class="w-full px-4 py-2.5 border border-cbsua-border rounded-lg" rows="2" placeholder="Briefly describe intended use"></textarea>
         </div>
-        <div data-request-classification-fields="consumable" hidden>
-          <div class="rounded-lg border border-cbsua-border p-4">
-            <h4 class="font-semibold">RIS form details</h4>
-            <label class="mb-2 mt-4 block font-medium" for="requestFundCluster">Fund Cluster</label>
-            <input id="requestFundCluster" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
-          </div>
-        </div>
         <div data-request-classification-fields="semi-expendable" hidden>
           <div class="space-y-4 rounded-lg border border-cbsua-border p-4">
             <h4 class="font-semibold">ICS form details</h4>
@@ -339,23 +333,15 @@
                 <input id="requestIcsDeliveryReceiptDate" type="date" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
               </div>
               <div>
-                <label class="mb-2 block font-medium" for="requestIcsPurchaseOrderNumber">P.O. No.</label>
-                <input id="requestIcsPurchaseOrderNumber" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
-              </div>
-              <div>
                 <label class="mb-2 block font-medium" for="requestIcsPurchaseOrderDate">P.O. Date</label>
                 <input id="requestIcsPurchaseOrderDate" type="date" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
-              </div>
-              <div>
-                <label class="mb-2 block font-medium" for="requestIcsIarNumber">IAR Number</label>
-                <input id="requestIcsIarNumber" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
               </div>
               <div>
                 <label class="mb-2 block font-medium" for="requestIcsIarDate">IAR Date</label>
                 <input id="requestIcsIarDate" type="date" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
               </div>
             </div>
-            <p class="text-xs text-cbsua-muted">Unit cost is used to calculate the total cost on the ICS. Purchase and receipt references can be added when available.</p>
+            <p class="text-xs text-cbsua-muted">Unit cost is used to calculate the total cost on the ICS.</p>
           </div>
         </div>
         <div data-request-classification-fields="fixed-asset" hidden>

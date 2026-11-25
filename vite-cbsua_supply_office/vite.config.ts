@@ -14,7 +14,7 @@ export default defineConfig({
         login: resolve(projectRoot, 'src/html/index.html'),
         dashboard: resolve(projectRoot, 'src/html/dashboard.html'),
         end_user_dashboard: resolve(projectRoot, 'src/html/end_user_dashboard.html'),
-        asset_qr: resolve(projectRoot, 'src/html/asset_qr.html'),
+        asset_scanner: resolve(projectRoot, 'src/html/asset_scanner.html'),
         inventory: resolve(projectRoot, 'src/html/inventory.html'),
         issue_supply: resolve(projectRoot, 'src/html/issue_supply.html'),
         navigation: resolve(projectRoot, 'src/html/navigation.html'),
@@ -23,6 +23,16 @@ export default defineConfig({
         stock_request: resolve(projectRoot, 'src/html/stock_request.html'),
         suppliers: resolve(projectRoot, 'src/html/suppliers.html'),
       },
+    },
+  },
+  server: {
+    proxy: {
+      '/api': 'http://127.0.0.1:3001',
+    },
+  },
+  preview: {
+    proxy: {
+      '/api': 'http://127.0.0.1:3001',
     },
   },
 })

@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="../CSS/style.css" />
   <script type="module" src="../Javascript/form-validation.js"></script>
   <script type="module" src="../Javascript/dashboard.js"></script>
+  <script type="module" src="../Javascript/scanner-link.js"></script>
 
 </head>
 <body class="font-sans bg-gray-50 min-h-screen">
@@ -99,9 +100,15 @@
       </div>
 
       <!-- Action Buttons -->
-      <div class="flex justify-between items-center mb-6">
+      <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
         <p class="text-cbsua-muted text-sm">16 October 2026 — Friday</p>
-        <div class="flex gap-3">
+        <div class="flex flex-wrap justify-end gap-3">
+          <div class="flex flex-col items-end gap-1">
+            <button type="button" data-share-asset-scanner class="px-4 py-2 border border-cbsua-border rounded-lg text-sm font-medium hover:bg-gray-50">
+              Share mobile scanner
+            </button>
+            <a data-asset-scanner-link hidden target="_blank" rel="noopener noreferrer" class="max-w-64 break-all text-right text-xs text-cbsua-primary underline"></a>
+          </div>
           <button class="px-4 py-2 border border-cbsua-border rounded-lg text-sm font-medium hover:bg-gray-50">
             + New request
           </button>

@@ -96,7 +96,8 @@ window.IMS.pageFeatures.push(() => {
       const searchableText = [
         request.id, request.date, request.office, request.recipient,
         request.employeeId, request.item, request.quantity,
-        request.supplyClassification, request.documentType
+        request.supplyClassification, request.documentType,
+        ...Object.values(request.classificationDetails || {})
       ].map(value => value || '').join(' ').toLowerCase();
       return (!statusFilter
         || status === statusFilter
@@ -173,6 +174,13 @@ window.IMS.pageFeatures.push(() => {
             : 'Existing request'
         ].filter(Boolean).join(' · '))
       );
+      const references = request.classificationDetails || {};
+      const referenceSummary = [
+        references.fundCluster && `FC: ${references.fundCluster}`,
+        references.purchaseOrderNumber && `PO: ${references.purchaseOrderNumber}`,
+        references.iarNumber && `IAR: ${references.iarNumber}`
+      ].filter(Boolean).join(' · ');
+      if (referenceSummary) details.append(detail('Generated references', referenceSummary));
       card.append(header, details);
 
       const actions = document.createElement('div');
@@ -215,7 +223,7 @@ window.IMS.pageFeatures.push(() => {
       return `"${safeText.replace(/"/g, '""')}"`;
     };
     const csv = [
-      ['Request / Date', 'Office / Recipient', 'Item / Quantity', 'Handler', 'Status'],
+      ['Request / Date', 'Office / Recipient', 'Item / Quantity / Generated references', 'Handler', 'Status'],
       ...visibleRows.map(row => [...row.cells].slice(0, 5).map(cell => cell.innerText))
     ].map(values => values.map(escapeCell).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }));

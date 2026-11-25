@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Asset Scanner — CBSUA Supply IMS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module" src="../Javascript/script.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <link rel="stylesheet" href="../CSS/style.css" />
+</head>
+<body class="min-h-screen bg-gray-50 font-sans">
+  <main class="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+    <header class="mb-6">
+      <p class="text-sm font-medium text-cbsua-primary">CBSUA Supply Office</p>
+      <h1 class="mt-1 text-2xl font-bold">Asset scanner</h1>
+      <p class="mt-2 text-sm text-cbsua-muted">Scan a Semi-Expendable or Fixed Asset QR code to view the recorded item details.</p>
+    </header>
+
+    <p id="scannerStatus" class="mb-4 rounded-lg border border-cbsua-border bg-white p-4 text-sm" role="status" aria-live="polite">
+      Preparing scanner...
+    </p>
+
+    <section id="assetDetails" class="hidden rounded-xl border border-cbsua-border bg-white p-5 shadow-sm" aria-labelledby="assetName">
+      <div class="mb-4">
+        <p id="assetDocumentType" class="text-sm font-semibold text-cbsua-primary"></p>
+        <h2 id="assetName" class="mt-1 text-xl font-bold"></h2>
+        <p id="assetCode" class="mt-1 text-sm text-cbsua-muted"></p>
+      </div>
+      <dl id="assetDetailList" class="grid gap-3 border-t border-cbsua-border pt-4 sm:grid-cols-2"></dl>
+      <button id="scanAnotherAsset" type="button" class="mt-5 rounded-lg border border-cbsua-border px-4 py-2 text-sm font-medium hover:bg-gray-50">
+        Scan another asset
+      </button>
+    </section>
+
+    <section id="cameraPanel" class="hidden rounded-xl border border-cbsua-border bg-white p-4 shadow-sm" aria-label="Camera scanner">
+      <div id="qrReader"></div>
+    </section>
+  </main>
+  <script type="module" src="../Javascript/asset-scanner.js"></script>
+</body>
+</html>

@@ -29,7 +29,8 @@ window.tailwind.config = {
   } }
 };
 document.addEventListener('DOMContentLoaded', async () => {
-  if (currentPage === 'index.html' || currentPage === 'navigation.html' || currentPage === 'offices.html') return;
+  if (currentPage === 'index.html' || currentPage === 'navigation.html' || currentPage === 'offices.html'
+    || currentPage === 'asset_scanner.html') return;
 
   let currentUser;
   try {
@@ -72,6 +73,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     getLocalRecords, saveRecord, updateRequestStatus, updateInventoryItem, updateSupplier, addInventoryRow,
     addRequestRow, addSupplierCard, nextRecordId, nextRequestId
   } = window.IMS;
+  function nextGeneratedReference(prefix, transactionDate) {
+    const [year, month] = transactionDate.split('-');
+    const fieldByPrefix = {
+      FC: 'fundCluster',
+      PO: 'purchaseOrderNumber',
+      IAR: 'iarNumber'
+    };
+    const field = fieldByPrefix[prefix];
+    const pattern = new RegExp(`^${prefix}-(\\d{4})-\\d{2}-(\\d{3})$`);
+    const sequence = getLocalRecords('requests').reduce((maximum, request) => {
+      const value = request.classificationDetails?.[field];
+      const match = String(value || '').match(pattern);
+      return match && match[1] === year ? Math.max(maximum, Number(match[2])) : maximum;
+    }, 0) + 1;
+    return `${prefix}-${year}-${month}-${String(sequence).padStart(3, '0')}`;
+  }
   const quarterlyRequestLimit = 40;
   function getQuarterKey(value) {
     let date;
@@ -140,12 +157,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       documentName: 'Requisition and Issue Slip'
     },
     'semi-expendable': {
-      label: 'Semi Expendable',
+      label: 'Semi-expendable',
       documentType: 'ICS',
       documentName: 'Inventory Custodian Slip'
     },
     'fixed-asset': {
-      label: 'Fixed Asset (PPE)',
+      label: 'Fixed Asset',
       documentType: 'PAR',
       documentName: 'Property Acknowledgment Receipt'
     }
@@ -580,12 +597,47 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   function openHelp() {
     dialogTitle.textContent = 'Help & support';
-    dialogDescription.textContent = 'CBSUA Supply Office Inventory Management System';
+    dialogDescription.textContent = 'Frequently asked questions and help for using the CBSUA Supply Office system.';
     dialogContent.replaceChildren();
-    [
-      'Use the workspace menu to move between the Dashboard, Inventory, Stock Requests, Issue Supplies, Receive Stock, Suppliers, and Offices. Inventory items, requests, suppliers, offices, and stock movements are saved locally in this browser.',
-      'For account access, password resets, or operational support, contact the Supply Office in person.'
-    ].forEach(text => dialogContent.append(createElement('p', '', text)));
+
+    if (currentUser.role === 'end-user') {
+      const guide = createElement('section', 'rounded-xl border border-cbsua-border bg-cbsua-pale p-4');
+      guide.append(
+        createElement('h3', 'text-base font-semibold text-gray-900 dark:text-gray-100', 'First-time user guide'),
+        createElement('p', 'mt-1 text-sm', 'Follow these steps to submit and track a supply request.')
+      );
+      const steps = document.createElement('ol');
+      steps.className = 'mt-3 list-decimal space-y-2 pl-5 text-sm';
+      [
+        'Review Available items and choose an item that is in stock.',
+        'Select + New stock request, then choose Consumable, Semi-expendable, or Fixed Asset to open the matching request form.',
+        'Confirm the item, enter the quantity and purpose, and check your employee ID. Your name and office are filled from your account.',
+        'Submit the request. Follow its status in My request history or Request updates.',
+        'You can cancel a request while it is Pending. Contact the Supply Office if a request that has already been reviewed needs a change.'
+      ].forEach(text => steps.append(createElement('li', '', text)));
+      guide.append(steps);
+      dialogContent.append(guide);
+    }
+
+    const faqSection = createElement('section', 'space-y-3');
+    faqSection.append(createElement('h3', 'text-base font-semibold text-gray-900 dark:text-gray-100', 'Frequently Asked Questions (FAQ)'));
+    const faqItems = [
+      ['Which supply classification should I choose?', 'Choose the classification that matches the requested item. Consumable requests use the RIS form, Semi-expendable requests use ICS, and Fixed Asset requests use PAR. Ask the Supply Office if you are unsure.'],
+      ['What do the request statuses mean?', 'Pending means the Supply Office has not reviewed it yet. Approved means it can proceed to issue. Issued means the supply issue was recorded. Rejected means it was not approved; Cancelled means the requester cancelled it while pending.'],
+      ['Can I change or cancel a request?', 'A Pending request can be cancelled from My request history. If the Supply Office has already reviewed it, contact the Supply Office for help.'],
+      ['Where can I see request updates?', 'Use Request updates near the top of your dashboard and My request history to check the latest status and remarks.'],
+      ['Why can I only request some items or quantities?', 'The available-items list shows items with stock. The request form also checks current stock and displays any applicable quantity limit.'],
+      ['Where are my records saved?', 'Records are saved in this browser on this device. Continue using the same browser and avoid clearing its site data if you need to keep access to those records.'],
+      ['Who can help with account access or other issues?', 'Contact the Supply Office in person for account access, password resets, or operational support.']
+    ];
+    faqItems.forEach(([question, answer]) => {
+      const entry = createElement('details', 'rounded-lg border border-gray-200 px-4 py-3 dark:border-gray-700');
+      const summary = createElement('summary', 'cursor-pointer font-medium text-gray-900 dark:text-gray-100', question);
+      entry.append(summary, createElement('p', 'mt-2 text-sm', answer));
+      faqSection.append(entry);
+    });
+    dialogContent.append(faqSection);
+
     dialogActions.replaceChildren();
     const closeButton = createElement('button', 'rounded-lg bg-cbsua-primary px-4 py-2 text-white', 'Close');
     closeButton.type = 'button';
@@ -712,13 +764,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         fields[2].value = item.description || '';
         fields[3].value = [...fields[3].options].find(option => option.textContent.includes(item.category))?.value || fields[3].options[0].value;
         fields[4].value = [...fields[4].options].find(option => option.textContent.includes(item.supplier))?.value || fields[4].options[0].value;
-        fields[5].value = item.unit;
-        fields[6].value = item.minimum;
-        fields[7].value = item.quantity;
-        fields[8].value = item.expiry || '';
+        fields[5].value = item.supplyClassification || '';
+        fields[6].value = item.unit;
+        fields[7].value = item.minimum;
+        fields[8].value = item.quantity;
+        fields[9].value = item.expiry || '';
         fields[0].readOnly = true;
-        fields[7].readOnly = true;
-        fields[7].previousElementSibling.textContent = 'On-hand quantity (adjust via receiving / issuance)';
+        fields[8].readOnly = true;
+        fields[8].previousElementSibling.textContent = 'On-hand quantity (adjust via receiving / issuance)';
         heading.textContent = `Inspect / edit ${item.id}`;
         form.dataset.editingItem = item.id;
         return openModal(target);
@@ -843,16 +896,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       event.stopImmediatePropagation();
       if (form.id === 'addItemForm') {
         const fields = [...form.querySelectorAll('input, select, textarea')];
-        const minimum = Number(fields[6].value);
-        const quantity = Number(fields[7].value);
+        const minimum = Number(fields[7].value);
+        const quantity = Number(fields[8].value);
         if (!Number.isSafeInteger(minimum) || minimum < 0 || !Number.isSafeInteger(quantity) || quantity < 0) {
           return showToast('Stock quantities must be whole numbers greater than or equal to zero.');
         }
         const item = {
           id: fields[0].value.trim().toUpperCase(), name: fields[1].value.trim(),
           description: fields[2].value.trim(), category: fields[3].selectedOptions[0].textContent.split(' — ').slice(1).join(' — '),
-          supplier: fields[4].selectedOptions[0].textContent.split(' — ').slice(1).join(' — '), unit: fields[5].value.trim(),
-          minimum, quantity, expiry: fields[8].value
+          supplier: fields[4].selectedOptions[0].textContent.split(' — ').slice(1).join(' — '),
+          supplyClassification: fields[5].value,
+          unit: fields[6].value.trim(), minimum, quantity, expiry: fields[9].value
         };
         const itemIdBeingEdited = form.dataset.editingItem;
         if (!itemIdBeingEdited && getLocalRecords('items').some(savedItem => savedItem.id === item.id)) {
@@ -866,8 +920,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelector('#searchInput')?.dispatchEvent(new Event('input', { bubbles: true }));
         form.reset();
         fields[0].readOnly = true;
-        fields[7].readOnly = false;
-        fields[7].previousElementSibling.textContent = 'Opening quantity *';
+        fields[8].readOnly = false;
+        fields[8].previousElementSibling.textContent = 'Opening quantity *';
         delete form.dataset.editingItem;
         document.querySelector('#addItemModal h3').textContent = 'Add a new inventory item';
         closeModal();
@@ -886,10 +940,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!classification) {
           return showToast('Choose a Supply Classification before completing the request form.');
         }
-        const classificationDetails = {};
-        if (classificationKey === 'consumable') {
-          classificationDetails.fundCluster = form.querySelector('#requestFundCluster').value.trim();
-        } else if (classificationKey === 'semi-expendable') {
+        const today = new Date();
+        today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+        const requestDate = today.toISOString().slice(0, 10);
+        const classificationDetails = {
+          fundCluster: nextGeneratedReference('FC', requestDate),
+          purchaseOrderNumber: nextGeneratedReference('PO', requestDate),
+          iarNumber: nextGeneratedReference('IAR', requestDate)
+        };
+        if (classificationKey === 'semi-expendable') {
           const specifications = form.querySelector('#requestIcsSpecifications').value.trim();
           if (!specifications) return showToast('Enter the specifications required for the ICS request.');
           const usefulLifeText = form.querySelector('#requestUsefulLife').value.trim();
@@ -907,9 +966,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           classificationDetails.unitCost = unitCost;
           classificationDetails.supplier = form.querySelector('#requestIcsSupplier').value.trim();
           classificationDetails.deliveryReceiptDate = form.querySelector('#requestIcsDeliveryReceiptDate').value;
-          classificationDetails.purchaseOrderNumber = form.querySelector('#requestIcsPurchaseOrderNumber').value.trim();
           classificationDetails.purchaseOrderDate = form.querySelector('#requestIcsPurchaseOrderDate').value;
-          classificationDetails.iarNumber = form.querySelector('#requestIcsIarNumber').value.trim();
           classificationDetails.iarDate = form.querySelector('#requestIcsIarDate').value;
         } else if (classificationKey === 'fixed-asset') {
           const specifications = form.querySelector('#requestSpecifications').value.trim();
@@ -937,11 +994,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         const request = {
           id: nextRequestId(),
-          date: (() => {
-            const today = new Date();
-            today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
-            return today.toISOString().slice(0, 10);
-          })(),
+          date: requestDate,
           createdAt: new Date().toISOString(),
           office: form.querySelector('#requestOffice').value,
           recipient: form.querySelector('#requestRecipient').value.trim(),

@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="../CSS/style.css" />
   <script type="module" src="../Javascript/form-validation.js"></script>
   <script type="module" src="../../node_modules/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script type="module" src="../Javascript/issue-supply.js"></script>
 
 </head>
@@ -85,7 +86,7 @@
           </div>
           <div class="flex flex-wrap justify-end gap-2">
             <button type="button" data-issue-document="form" class="px-3 py-2 border border-cbsua-border rounded-lg text-sm font-medium hover:bg-gray-50" disabled>Print official form</button>
-            <button type="button" data-issue-document="receipt" class="px-3 py-2 bg-cbsua-primary text-white rounded-lg text-sm font-medium hover:bg-green-700" disabled>Export Receipt</button>
+            <button type="button" data-issue-document="qr" class="px-3 py-2 bg-cbsua-primary text-white rounded-lg text-sm font-medium hover:bg-green-700" disabled>Export QR codes</button>
           </div>
         </div>
       </div>

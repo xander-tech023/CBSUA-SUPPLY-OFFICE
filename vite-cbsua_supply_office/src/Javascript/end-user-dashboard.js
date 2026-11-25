@@ -39,7 +39,17 @@ window.IMS.pageFeatures.push(() => {
     const formSummary = request.documentType
       ? `${request.supplyClassification || 'Classification not set'} · ${request.documentType}`
       : 'Existing request';
-    itemQuantity.textContent = [request.quantity || 'Quantity not recorded', formSummary].join(' · ');
+    const references = request.classificationDetails || {};
+    const referenceSummary = [
+      references.fundCluster && `FC: ${references.fundCluster}`,
+      references.purchaseOrderNumber && `PO: ${references.purchaseOrderNumber}`,
+      references.iarNumber && `IAR: ${references.iarNumber}`
+    ].filter(Boolean).join(' · ');
+    itemQuantity.textContent = [
+      request.quantity || 'Quantity not recorded',
+      formSummary,
+      referenceSummary
+    ].filter(Boolean).join(' · ');
     itemCell.append(itemName, itemQuantity);
 
     const statusCell = document.createElement('td');

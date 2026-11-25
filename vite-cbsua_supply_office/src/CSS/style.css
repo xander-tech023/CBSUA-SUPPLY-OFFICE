@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
 :root {
   --cbsua-dark: #084236;
   --cbsua-primary: #166534;
@@ -24,9 +26,13 @@ html {
 }
 
 body {
-  font-family: system-ui, sans-serif;
+  font-family: Poppins, sans-serif;
   background: #f8fafc;
   color: #111827;
+}
+
+body.font-sans {
+  font-family: Poppins, sans-serif;
 }
 
 .hidden {
@@ -155,6 +161,41 @@ body {
 
   .ims-print-document:not(.ims-print-ris-document) {
     padding: 8mm;
+  }
+
+  .ims-print-asset-document {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: 8mm;
+  }
+
+  .ims-print-asset-label {
+    display: flex;
+    min-height: 82mm;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    break-inside: avoid;
+    border: 1px solid #999;
+    padding: 5mm;
+    text-align: center;
+  }
+
+  .ims-print-asset-heading h2 {
+    margin: 2mm 0;
+    font-size: 15pt;
+    font-weight: 700;
+  }
+
+  .ims-print-asset-qr canvas,
+  .ims-print-asset-qr img {
+    display: block;
+    margin: 0 auto;
+  }
+
+  .ims-print-asset-info {
+    font-size: 8pt;
   }
 
   .ims-print-ris-document {

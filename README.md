@@ -2,14 +2,19 @@
 
 ## Start the application
 
-Run the React/Vite application from `vite-cbsua_supply_office`:
+Run the API from the repository root and the Vite app from `vite-cbsua_supply_office` in separate terminals:
 
 ```sh
-npm install
-npm run dev
+npm run api
 ```
 
-Use the URL printed by Vite. Build and preview the production files with `npm run build` and `npm run preview` from the same directory.
+```sh
+cd vite-cbsua_supply_office
+npm install
+npm run dev -- --host 0.0.0.0
+```
+
+The Vite server proxies `/api` requests to the API on port `3001`. Build the frontend with `npm run build` from `vite-cbsua_supply_office`; the API serves the built files from `vite-cbsua_supply_office/dist`. Set `PUBLIC_APP_URL` to the public application base URL when deploying behind a domain or path prefix.
 
 The workspace includes starter inventory, supplier, request, receipt, and issuance data. Added or edited records are saved in local browser storage and remain available until browser data is cleared.
 
@@ -24,8 +29,8 @@ Admin and staff credentials are fixed and cannot be changed from **Settings**. T
 
 Appearance preferences are local to the browser. Delivery attachments are not uploaded; only the selected filename is recorded.
 
-The Stock Requests page exports its currently filtered rows as CSV. Issue Supplies can print an approved requisition gate pass and export a recorded receipt through the browser's print dialog; choose **Save as PDF** to create a PDF. Status messages appear as floating notifications.
+The Stock Requests page exports its currently filtered rows as CSV. Issue Supplies can print official forms and export printable QR labels for issued ICS and PAR assets through the browser's print dialog; choose **Save as PDF** to create a PDF. Status messages appear as floating notifications.
 
-Inventory's **Asset QR codes** page generates printable labels for issued ICS and PAR records. Scanning a label displays the MR holder, office, item specifications, and issuance details directly in the scanner. The QR contains a snapshot of those details, so regenerate the label after assignment or specification changes. Anyone with the QR can view its details.
+Admin, staff, and end-user home pages can request a mobile scanner link from the API. QR labels contain a self-contained snapshot of eligible asset details, not holder or employee information; anyone with a QR link can view that snapshot. Regenerate labels after item details change. Camera scanning requires a secure HTTPS origin on mobile devices.
 
 Tailwind CSS and optional page integrations are loaded from their CDNs and require an internet connection.

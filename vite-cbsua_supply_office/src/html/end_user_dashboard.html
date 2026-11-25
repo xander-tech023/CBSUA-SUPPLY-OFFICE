@@ -11,6 +11,7 @@
   <script type="module" src="../Javascript/script.js"></script>
   <link rel="stylesheet" href="../CSS/style.css" />
   <script type="module" src="../Javascript/end-user-dashboard.js"></script>
+  <script type="module" src="../Javascript/scanner-link.js"></script>
 </head>
 <body class="font-sans bg-gray-50 min-h-screen">
   <div class="flex">
@@ -60,7 +61,7 @@
           <h2 class="text-2xl font-bold mt-1">My Supply Requests</h2>
           <p class="text-cbsua-muted text-sm">Request available supplies and track requests for your office.</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center justify-end gap-3">
           <div class="relative">
             <button type="button" class="relative p-2 border border-cbsua-border rounded-lg hover:bg-gray-50" id="userNotificationToggle" aria-label="Request notifications" aria-controls="userNotificationPanel" aria-expanded="false">
               <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -76,6 +77,12 @@
               </div>
               <div id="userNotificationList" class="max-h-96 overflow-y-auto" aria-live="polite"></div>
             </section>
+          </div>
+          <div class="flex flex-col items-end gap-1">
+            <button type="button" data-share-asset-scanner class="rounded-lg border border-cbsua-border px-3 py-2 text-sm font-medium hover:bg-gray-50">
+              Share mobile scanner
+            </button>
+            <a data-asset-scanner-link hidden target="_blank" rel="noopener noreferrer" class="max-w-64 break-all text-right text-xs text-cbsua-primary underline"></a>
           </div>
           <button type="button" class="p-2 border border-cbsua-border rounded-lg hover:bg-gray-50" id="themeToggle" aria-label="Change appearance">
             <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M20 14.5A7.5 7.5 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -167,11 +174,11 @@
           <span class="mt-1 block text-sm text-cbsua-muted">RIS · Requisition and Issue Slip</span>
         </button>
         <button type="button" data-select-supply-classification="semi-expendable" class="rounded-lg border border-cbsua-border p-4 text-left hover:border-cbsua-primary hover:bg-cbsua-pale">
-          <span class="block font-semibold">Semi Expendable</span>
+          <span class="block font-semibold">Semi-expendable</span>
           <span class="mt-1 block text-sm text-cbsua-muted">ICS · Inventory Custodian Slip</span>
         </button>
         <button type="button" data-select-supply-classification="fixed-asset" class="rounded-lg border border-cbsua-border p-4 text-left hover:border-cbsua-primary hover:bg-cbsua-pale">
-          <span class="block font-semibold">Fixed Asset (PPE)</span>
+          <span class="block font-semibold">Fixed Asset</span>
           <span class="mt-1 block text-sm text-cbsua-muted">PAR · Property Acknowledgment Receipt</span>
         </button>
       </div>
@@ -188,6 +195,7 @@
         <p data-request-form-summary class="font-medium"></p>
         <button type="button" data-change-supply-classification class="shrink-0 text-sm font-medium text-cbsua-primary hover:underline">Change</button>
       </div>
+      <p class="text-sm text-cbsua-muted">Fund Cluster, P.O. No., and IAR Number are generated on submission and shown in the saved request.</p>
         <div>
           <label class="mb-2 block font-medium" for="requestOffice">Requesting office</label>
           <input id="requestOffice" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" readonly />
@@ -216,13 +224,6 @@
           <label class="mb-2 block font-medium" for="requestRemarks">Purpose / Remarks</label>
           <textarea id="requestRemarks" rows="3" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" placeholder="Explain what the supplies are needed for or add a note for the administrator."></textarea>
         </div>
-        <div data-request-classification-fields="consumable" hidden>
-          <div class="rounded-lg border border-cbsua-border p-4">
-            <h4 class="font-semibold">RIS form details</h4>
-            <label class="mb-2 mt-4 block font-medium" for="requestFundCluster">Fund Cluster</label>
-            <input id="requestFundCluster" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
-          </div>
-        </div>
         <div data-request-classification-fields="semi-expendable" hidden>
           <div class="space-y-4 rounded-lg border border-cbsua-border p-4">
             <h4 class="font-semibold">ICS form details</h4>
@@ -248,23 +249,15 @@
                 <input id="requestIcsDeliveryReceiptDate" type="date" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
               </div>
               <div>
-                <label class="mb-2 block font-medium" for="requestIcsPurchaseOrderNumber">P.O. No.</label>
-                <input id="requestIcsPurchaseOrderNumber" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
-              </div>
-              <div>
                 <label class="mb-2 block font-medium" for="requestIcsPurchaseOrderDate">P.O. Date</label>
                 <input id="requestIcsPurchaseOrderDate" type="date" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
-              </div>
-              <div>
-                <label class="mb-2 block font-medium" for="requestIcsIarNumber">IAR Number</label>
-                <input id="requestIcsIarNumber" type="text" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
               </div>
               <div>
                 <label class="mb-2 block font-medium" for="requestIcsIarDate">IAR Date</label>
                 <input id="requestIcsIarDate" type="date" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" />
               </div>
             </div>
-            <p class="text-xs text-cbsua-muted">Unit cost is used to calculate the total cost on the ICS. Purchase and receipt references can be added when available.</p>
+            <p class="text-xs text-cbsua-muted">Unit cost is used to calculate the total cost on the ICS.</p>
           </div>
         </div>
         <div data-request-classification-fields="fixed-asset" hidden>

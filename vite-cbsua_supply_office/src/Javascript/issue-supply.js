@@ -30,7 +30,7 @@ window.IMS.pageFeatures.push(() => {
     date: document.getElementById('issueAuditDate')
   };
   const officialFormButton = document.querySelector('[data-issue-document="form"]');
-  const receiptButton = document.querySelector('[data-issue-document="receipt"]');
+  const assetQrButton = document.querySelector('[data-issue-document="qr"]');
   const officialFormNames = {
     RIS: 'Requisition and Issue Slip',
     ICS: 'Inventory Custodian Slip',
@@ -46,7 +46,7 @@ window.IMS.pageFeatures.push(() => {
   printDocument.className = 'ims-print-document';
   printDocument.hidden = true;
   document.body.append(printDocument);
-  if (receiptButton) receiptButton.disabled = !lastIssuance;
+  if (assetQrButton) assetQrButton.disabled = !getIssuedAssetQrRecords().length;
   const today = new Date();
   today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
   form.querySelector('#issueDate').value = today.toISOString().slice(0, 10);
@@ -161,6 +161,102 @@ window.IMS.pageFeatures.push(() => {
         : requests[0].id;
     }
     updatePreview(true);
+  }
+
+  function getIssuedAssetQrRecords() {
+    const requests = new Map(getLocalRecords('requests').map(request => [request.id, request]));
+    const items = new Map(getLocalRecords('items').map(item => [item.id, item]));
+    return getLocalRecords('issuances').map(issuance => {
+      const request = requests.get(issuance.requestId);
+      const item = items.get(issuance.itemId);
+      const documentType = String(request?.documentType || '').toUpperCase();
+      if (!request || !item || !['ICS', 'PAR'].includes(documentType)) return null;
+
+      const details = request.classificationDetails || {};
+      const specifications = [...new Set([details.specifications, item.description]
+        .map(value => String(value || '').trim()).filter(Boolean))].join('\n');
+      return {
+        documentType,
+        classification: request.supplyClassification || (documentType === 'ICS' ? 'Semi-Expendable' : 'Fixed Asset'),
+        itemCode: item.id,
+        itemName: item.name,
+        description: item.description || '',
+        specifications,
+        quantity: issuance.quantity,
+        unit: item.unit || '',
+        propertyNumber: details.propertyNumber || item.propertyNumber || '',
+        estimatedUsefulLifeYears: details.estimatedUsefulLifeYears || details.usefulLifeYears || '',
+        dateAcquired: details.dateAcquired || item.dateAcquired || '',
+        amount: details.amount ?? '',
+        unitCost: details.unitCost ?? details.estimatedUnitCost ?? '',
+        supplier: details.supplier || item.supplier || '',
+        deliveryReceiptDate: details.deliveryReceiptDate || '',
+        purchaseOrderNumber: details.purchaseOrderNumber || '',
+        purchaseOrderDate: details.purchaseOrderDate || '',
+        iarNumber: details.iarNumber || '',
+        iarDate: details.iarDate || '',
+        fundCluster: details.fundCluster || '',
+        issuedOn: issuance.date || request.date || '',
+        issuanceReference: issuance.id
+      };
+    }).filter(Boolean);
+  }
+
+  async function exportAssetQrCodes() {
+    const records = getIssuedAssetQrRecords();
+    if (!records.length) {
+      showToast('There are no issued ICS or PAR assets to export QR codes for.');
+      return;
+    }
+    if (!window.QRCode) throw new Error('The QR code generator did not load. Check your internet connection and reload.');
+
+    const recordsWithLinks = await Promise.all(records.map(async asset => {
+      const response = await fetch('/api/scanner-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appUrl: location.origin, asset })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `Scanner API returned ${response.status}.`);
+      return { asset, url: result.url };
+    }));
+
+    printDocument.replaceChildren();
+    printDocument.className = 'ims-print-document ims-print-asset-document';
+    recordsWithLinks.forEach(({ asset, url }) => {
+      const label = makeTextElement('section', 'ims-print-asset-label', '');
+      const heading = makeTextElement('header', 'ims-print-asset-heading', '');
+      heading.append(
+        makeTextElement('p', '', `${asset.documentType} · ${asset.classification}`),
+        makeTextElement('h2', '', asset.itemName),
+        makeTextElement('p', '', `${asset.itemCode} · ${asset.issuanceReference}`)
+      );
+      const qr = makeTextElement('div', 'ims-print-asset-qr', '');
+      qr.setAttribute('aria-label', `QR code for ${asset.itemName}`);
+      new window.QRCode(qr, {
+        text: url,
+        width: 180,
+        height: 180,
+        correctLevel: window.QRCode.CorrectLevel.M
+      });
+      const info = makeTextElement('p', 'ims-print-asset-info', [
+        asset.propertyNumber && `Property No.: ${asset.propertyNumber}`,
+        asset.quantity && `Quantity: ${asset.quantity} ${asset.unit}`.trim(),
+        asset.issuedOn && `Issued: ${asset.issuedOn}`
+      ].filter(Boolean).join(' · '));
+      label.append(heading, qr, info);
+      printDocument.append(label);
+    });
+
+    const originalTitle = document.title;
+    document.title = 'CBSUA-Asset-QR-Codes';
+    printDocument.hidden = false;
+    window.addEventListener('afterprint', () => {
+      printDocument.hidden = true;
+      printDocument.className = 'ims-print-document';
+      document.title = originalTitle;
+    }, { once: true });
+    window.print();
   }
 
   function makeTextElement(tag, className, text) {
@@ -697,11 +793,12 @@ window.IMS.pageFeatures.push(() => {
   document.querySelectorAll('[data-issue-document]').forEach(button => {
     button.addEventListener('click', () => {
       const type = button.dataset.issueDocument;
-      printSupplyDocument(type).catch(error => {
+      const operation = type === 'qr' ? exportAssetQrCodes() : printSupplyDocument(type);
+      operation.catch(error => {
         console.error('Could not generate the requested print document.', error);
         const documentType = selectedRequest?.documentType || 'RIS';
-        const documentName = type === 'receipt'
-          ? 'receipt'
+        const documentName = type === 'qr'
+          ? 'QR codes'
           : officialFormNames[documentType] || 'official form';
         showToast(`Could not create the ${documentName}: ${error.message}`);
       });
@@ -709,10 +806,13 @@ window.IMS.pageFeatures.push(() => {
   });
   window.addEventListener('ims:issuance-saved', event => {
     lastIssuance = event.detail;
-    if (receiptButton) receiptButton.disabled = !lastIssuance;
+    if (assetQrButton) assetQrButton.disabled = !getIssuedAssetQrRecords().length;
   });
   requestSelect.addEventListener('change', () => updatePreview(true));
   quantityInput.addEventListener('input', () => updatePreview());
   window.addEventListener('ims:records-updated', refreshRequests);
+  window.addEventListener('ims:records-updated', () => {
+    if (assetQrButton) assetQrButton.disabled = !getIssuedAssetQrRecords().length;
+  });
   refreshRequests();
 });
