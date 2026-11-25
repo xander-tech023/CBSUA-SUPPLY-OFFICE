@@ -1,17 +1,17 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "lib": ["ES2020", "DOM"],
+    "module": "None",
     "strict": true,
-    "esModuleInterop": true,
+    "alwaysStrict": false,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "noEmit": true,
-    "allowJs": true,
-    "checkJs": false,
-    "types": ["node"]
+    "noEmit": false,
+    "rootDir": "./Javascript",
+    "outDir": "./Javascript",
+    "types": []
   },
-  "include": ["**/*.ts", "**/*.tsx", "**/*.js"],
+  "include": ["Javascript/**/*.ts"],
   "exclude": ["node_modules", "vite-cbsua_supply_office"]
 }
