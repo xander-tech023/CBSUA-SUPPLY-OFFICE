@@ -21,13 +21,13 @@ document.addEventListener('DOMContentLoaded', () => {
     notificationBadge.textContent = String(requests.length);
     notificationBadge.classList.toggle('hidden', requests.length === 0);
     notificationSummary.textContent = requests.length
-      ? `${requests.length} password reset${requests.length === 1 ? '' : 's'}`
+      ? `${requests.length} password change request${requests.length === 1 ? '' : 's'}`
       : 'No active alerts';
 
     if (!requests.length) {
       const empty = document.createElement('p');
       empty.className = 'px-4 py-6 text-center text-sm text-cbsua-muted';
-      empty.textContent = 'No pending password reset requests.';
+      empty.textContent = 'No pending password change requests.';
       notificationList.append(empty);
       return;
     }
@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
       item.className = 'border-b border-cbsua-border px-4 py-3 last:border-b-0';
       const title = document.createElement('p');
       title.className = 'font-medium';
-      title.textContent = 'Password reset request';
+      title.textContent = 'Password change request';
       const account = document.createElement('p');
       account.className = 'mt-1 text-sm';
       account.textContent = `${request.accountName || request.username} (@${request.username})`;
@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
         rejectButton.textContent = 'Reject';
         rejectButton.addEventListener('click', () => {
           window.IMS.accounts.rejectPasswordReset(request.id)
-            .then(() => window.IMS.showToast(`Password reset request for ${request.username} rejected.`))
+            .then(() => window.IMS.showToast(`Password change request for ${request.username} rejected.`))
             .catch(error => window.IMS.showToast(error.message));
         });
         const approveButton = document.createElement('button');
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
         approveButton.textContent = 'Approve';
         approveButton.addEventListener('click', () => {
           window.IMS.accounts.approvePasswordReset(request.id)
-            .then(() => window.IMS.showToast(`Password reset request for ${request.username} approved.`))
+            .then(() => window.IMS.showToast(`Password change request for ${request.username} approved.`))
             .catch(error => window.IMS.showToast(error.message));
         });
         actions.append(rejectButton, approveButton);

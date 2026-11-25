@@ -53,22 +53,27 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderResetStatus() {
     const username = localStorage.getItem(lastResetUsernameKey);
     if (!username) {
-      showResetPassword.textContent = 'Reset password';
+      showResetPassword.textContent = 'Change password';
+      showResetPassword.disabled = false;
       return;
     }
     const latestRequest = window.IMS.accounts.readPasswordResetRequests()
       .filter(request => request.username === username && ['staff', 'end-user'].includes(request.role))
       .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt))[0];
     if (!latestRequest) {
-      showResetPassword.textContent = 'Reset password';
+      showResetPassword.textContent = 'Change password';
+      showResetPassword.disabled = false;
       return;
     }
 
     if (latestRequest.status === 'Approved') {
       showResetPassword.textContent = 'Change password';
+      showResetPassword.disabled = false;
       return;
     }
-    showResetPassword.textContent = 'Reset password';
+    const requestPending = latestRequest.status === 'Pending';
+    showResetPassword.textContent = requestPending ? 'Request pending' : 'Change password';
+    showResetPassword.disabled = requestPending;
   }
 
   function setResetPasswordMode(requesting) {
@@ -105,13 +110,13 @@ document.addEventListener('DOMContentLoaded', () => {
       .then(() => {
         localStorage.setItem(lastResetUsernameKey, username.toLowerCase());
         resetPasswordRequestForm.reset();
-        registrationSuccess.textContent = 'Password reset request sent to the administrator.';
+        registrationSuccess.textContent = 'Password change request sent to the administrator for approval.';
         registrationSuccess.classList.remove('hidden');
         setResetPasswordMode(false);
         renderResetStatus();
       })
       .catch(error => {
-        resetPasswordRequestErr.textContent = error.message || 'The reset request could not be submitted.';
+        resetPasswordRequestErr.textContent = error.message || 'The password change request could not be submitted.';
         resetPasswordRequestErr.classList.remove('hidden');
       });
   });

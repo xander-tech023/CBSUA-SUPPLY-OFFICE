@@ -73,7 +73,7 @@
               Remember me
             </label>
             <button type="button" id="showResetPassword" class="text-cbsua-primary text-sm font-medium hover:underline">
-              Reset password
+              Change password
             </button>
           </div>
 
@@ -210,8 +210,8 @@
 
         <form id="resetPasswordRequestForm" class="login-form text-start hidden" novalidate>
           <div>
-            <h2 class="text-2xl font-bold mb-2">Request password reset</h2>
-            <p class="text-cbsua-muted mb-1">Enter the username of the account that needs a reset.</p>
+            <h2 class="text-2xl font-bold mb-2">Request a password change</h2>
+            <p class="text-cbsua-muted mb-1">Enter your username. An administrator must approve your request before you can set a new password.</p>
           </div>
           <div>
             <label class="block font-medium mb-2" for="resetUsername">Username *</label>
@@ -219,7 +219,7 @@
           </div>
           <p class="hidden text-red-600 text-sm" id="resetPasswordRequestErr" role="alert"></p>
           <button type="submit" class="w-full bg-cbsua-primary hover:bg-green-700 text-white py-3 rounded-lg font-medium transition-colors">
-            Submit reset request
+            Send request to administrator
           </button>
           <button type="button" id="cancelResetPassword" class="w-full border border-cbsua-border text-cbsua-primary py-3 rounded-lg font-medium hover:bg-cbsua-light transition-colors">
             Back to log in
