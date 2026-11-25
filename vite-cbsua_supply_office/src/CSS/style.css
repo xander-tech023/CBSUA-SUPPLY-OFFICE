@@ -211,19 +211,6 @@ body {
     height: 15mm;
   }
 
-  .ims-print-ris-masthead .ims-print-ris-bagong-logo {
-    width: 17mm;
-    height: 16mm;
-    -webkit-mask-image: url("../Image/ris-bagong-pilipinas-mask.png");
-    mask-image: url("../Image/ris-bagong-pilipinas-mask.png");
-    -webkit-mask-size: contain;
-    mask-size: contain;
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    mask-position: center;
-  }
-
   .ims-print-ris-masthead .ims-print-ris-certification-logo {
     width: 21mm;
     height: 11mm;

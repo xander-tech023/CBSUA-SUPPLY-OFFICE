@@ -2,7 +2,14 @@
 
 ## Start the application
 
-Open `html/index.html` in a browser. The application runs entirely in the browser and does not require a server or additional setup.
+Run the React/Vite application from `vite-cbsua_supply_office`:
+
+```sh
+npm install
+npm run dev
+```
+
+Use the URL printed by Vite. Build and preview the production files with `npm run build` and `npm run preview` from the same directory.
 
 The workspace includes starter inventory, supplier, request, receipt, and issuance data. Added or edited records are saved in local browser storage and remain available until browser data is cleared.
 
@@ -21,4 +28,4 @@ The Stock Requests page exports its currently filtered rows as CSV. Issue Suppli
 
 Inventory's **Asset QR codes** page generates printable labels for issued ICS and PAR records. Scanning a label displays the MR holder, office, item specifications, and issuance details directly in the scanner. The QR contains a snapshot of those details, so regenerate the label after assignment or specification changes. Anyone with the QR can view its details.
 
-React and ReactDOM are included from jsDelivr and power the toast notification component. Tailwind CSS, Chart.js, and the QR code generator are loaded from their CDNs, so use a network connection when opening the pages.
+Tailwind CSS and optional page integrations are loaded from their CDNs and require an internet connection.
