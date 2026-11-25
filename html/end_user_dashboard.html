@@ -129,7 +129,7 @@
       <section id="myRequests" class="stat-card">
         <div class="mb-4">
           <h3 class="text-lg font-semibold">My request history</h3>
-          <p class="text-sm text-cbsua-muted">Review the status and remarks for your submitted requests.</p>
+          <p class="text-sm text-cbsua-muted">Review your requests and cancel any that are still pending.</p>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -138,6 +138,7 @@
                 <th class="pb-3 pr-4 font-medium">Request / Date</th>
                 <th class="pb-3 pr-4 font-medium">Item / Quantity</th>
                 <th class="pb-3 pr-4 font-medium">Status</th>
+                <th class="pb-3 pr-4 font-medium">Action</th>
                 <th class="pb-3 font-medium">Purpose / Remarks</th>
               </tr>
             </thead>
@@ -174,6 +175,9 @@
           <span class="mt-1 block text-sm text-cbsua-muted">PAR · Property Acknowledgment Receipt</span>
         </button>
       </div>
+      <div class="mt-4 flex justify-end">
+        <button type="button" data-close-modal class="rounded-lg border border-cbsua-border px-4 py-2 font-medium hover:bg-gray-50">Cancel</button>
+      </div>
     </section>
     <form id="requestForm" class="space-y-5" hidden>
         <input id="requestId" name="requestId" type="hidden" value="" readonly />
@@ -206,6 +210,7 @@
         <div>
           <label class="mb-2 block font-medium" for="requestQuantity">Requested quantity *</label>
           <input id="requestQuantity" type="number" min="1" step="1" value="1" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" required />
+          <p data-quarterly-request-limit class="mt-1 text-xs text-cbsua-muted" aria-live="polite">Quarterly limit: 40 units per item for each office.</p>
         </div>
         <div>
           <label class="mb-2 block font-medium" for="requestRemarks">Purpose / Remarks</label>

@@ -49,16 +49,32 @@ window.IMS.pageFeatures.push(() => {
     const statusClass = {
       Approved: 'bg-green-100 text-green-700',
       Issued: 'bg-blue-100 text-blue-700',
-      Rejected: 'bg-red-100 text-red-700'
+      Rejected: 'bg-red-100 text-red-700',
+      Cancelled: 'bg-red-100 text-red-700',
+      Canceled: 'bg-red-100 text-red-700'
     }[status] || 'bg-amber-100 text-amber-700';
     statusBadge.className = `badge rounded-full px-2.5 py-1 text-xs font-medium ${statusClass}`;
     statusBadge.textContent = status;
     statusCell.append(statusBadge);
 
+    const actionCell = document.createElement('td');
+    actionCell.className = 'py-3';
+    if (status === 'Pending') {
+      const cancelButton = document.createElement('button');
+      cancelButton.type = 'button';
+      cancelButton.className = 'rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50';
+      cancelButton.dataset.cancelRequest = request.id;
+      cancelButton.textContent = 'Cancel request';
+      actionCell.append(cancelButton);
+    } else {
+      actionCell.textContent = '—';
+      actionCell.classList.add('text-cbsua-muted');
+    }
+
     const remarksCell = document.createElement('td');
     remarksCell.className = 'py-3 text-cbsua-muted';
     remarksCell.textContent = request.remarks || '—';
-    row.append(requestCell, itemCell, statusCell, remarksCell);
+    row.append(requestCell, itemCell, statusCell, actionCell, remarksCell);
     return row;
   }
 
@@ -300,7 +316,7 @@ window.IMS.pageFeatures.push(() => {
       if (!requests.length) {
         const row = document.createElement('tr');
         const message = document.createElement('td');
-        message.colSpan = 4;
+        message.colSpan = 5;
         message.className = 'py-8 text-center text-sm text-cbsua-muted';
         message.textContent = 'You have not submitted any requests for this office yet.';
         row.append(message);
@@ -331,6 +347,17 @@ window.IMS.pageFeatures.push(() => {
 
   itemSelect?.addEventListener('change', () => {
     updateQuantityLimit(window.IMS.getLocalRecords('items').filter(item => Number(item.quantity) > 0));
+  });
+  requestList?.addEventListener('click', async event => {
+    const cancelButton = event.target.closest('[data-cancel-request]');
+    if (!cancelButton) return;
+    const requestId = cancelButton.dataset.cancelRequest;
+    const request = currentRequests.find(entry => entry.id === requestId);
+    if (!request || request.status !== 'Pending') return;
+    if (!window.confirm(`Cancel pending request ${requestId}?`)) return;
+    if (await window.IMS.cancelRequest(requestId)) {
+      window.IMS.showToast(`${requestId} cancelled.`);
+    }
   });
   notificationToggle?.addEventListener('click', () => {
     setNotificationPanelOpen(notificationPanel?.classList.contains('hidden'));
@@ -364,7 +391,7 @@ window.IMS.pageFeatures.push(() => {
     const requestButton = event.target.closest('[data-request-item]');
     if (requestButton && itemSelect) {
       itemSelect.value = requestButton.dataset.requestItem;
-      updateQuantityLimit(window.IMS.getLocalRecords('items').filter(item => Number(item.quantity) > 0));
+      itemSelect.dispatchEvent(new Event('change', { bubbles: true }));
     }
     if (!notificationPanel?.contains(event.target) && !notificationToggle?.contains(event.target)) {
       setNotificationPanelOpen(false);

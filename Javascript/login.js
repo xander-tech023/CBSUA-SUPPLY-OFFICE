@@ -1,4 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('input[type="password"]').forEach(input => {
+    ['copy', 'cut', 'paste', 'drop'].forEach(eventName => {
+      input.addEventListener(eventName, event => event.preventDefault());
+    });
+  });
+
   const passInput = document.getElementById('password');
   const loginForm = document.getElementById('loginForm');
   const errorMessage = document.getElementById('loginErr');

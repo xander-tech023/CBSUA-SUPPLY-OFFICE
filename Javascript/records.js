@@ -261,6 +261,23 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
         request.reviewedBy = window.IMS.currentUser.name;
         request.reviewedAt = new Date().toISOString();
         result = true;
+      } else if (action === 'cancel-request') {
+        const user = window.IMS.currentUser;
+        if (user?.role !== 'end-user') throw new Error('Only the requesting office can cancel this request.');
+        const request = records.requests.find(entry => entry.id === payload.requestId);
+        if (!request) throw new Error('The stock request could not be found.');
+        const isOwner = request.requesterId != null
+          ? String(request.requesterId) === String(user.id)
+          : String(request.office || '').trim().toLowerCase() === String(user.office || '').trim().toLowerCase()
+            && String(request.employeeId || '').trim().toUpperCase() === String(user.employeeId || '').trim().toUpperCase();
+        if (!isOwner) throw new Error('You can only cancel requests submitted by your account.');
+        if (String(request.status || 'Pending').toLowerCase() !== 'pending') {
+          throw new Error('Only pending requests can be cancelled.');
+        }
+        request.status = 'Cancelled';
+        request.cancelledAt = new Date().toISOString();
+        request.cancelledBy = user.id;
+        result = true;
       } else {
         throw new Error('Unknown action.');
       }
@@ -284,6 +301,10 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
       return false;
     }
     return Boolean(await runMutation('update-request-status', { requestId, status }));
+  }
+
+  async function cancelRequest(requestId) {
+    return Boolean(await runMutation('cancel-request', { requestId }));
   }
 
   function updateInventoryItem(itemId, changes) {
@@ -586,6 +607,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     getRemainingRequestQuantity,
     saveRecord,
     updateRequestStatus,
+    cancelRequest,
     updateInventoryItem,
     updateSupplier,
     addInventoryRow,

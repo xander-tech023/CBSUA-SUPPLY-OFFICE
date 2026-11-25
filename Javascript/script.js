@@ -72,6 +72,60 @@ document.addEventListener('DOMContentLoaded', async () => {
     getLocalRecords, saveRecord, updateRequestStatus, updateInventoryItem, updateSupplier, addInventoryRow,
     addRequestRow, addSupplierCard, nextRecordId, nextRequestId
   } = window.IMS;
+  const quarterlyRequestLimit = 40;
+  function getQuarterKey(value) {
+    let date;
+    const dateMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
+    if (dateMatch) {
+      date = new Date(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]));
+    } else {
+      date = new Date(value);
+    }
+    if (Number.isNaN(date.getTime())) return '';
+    return `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`;
+  }
+  function getRequestQuantity(quantity) {
+    const match = /^\s*(\d+)(?:\s|$)/.exec(String(quantity || ''));
+    if (!match) return 0;
+    const value = Number(match[1]);
+    return Number.isSafeInteger(value) ? value : 0;
+  }
+  function getQuarterlyRequestUsage(item, officeName, referenceDate = new Date()) {
+    if (!item || !officeName) return 0;
+    const quarter = getQuarterKey(referenceDate);
+    const normalizedOffice = String(officeName).trim().toLowerCase();
+    const normalizedItemName = String(item.name || '').trim().toLowerCase();
+    return getLocalRecords('requests').reduce((total, request) => {
+      const status = String(request.status || 'Pending').trim().toLowerCase();
+      if (['rejected', 'cancelled', 'canceled'].includes(status)) return total;
+      if (String(request.office || '').trim().toLowerCase() !== normalizedOffice) return total;
+      const matchesItem = request.itemId
+        ? String(request.itemId) === String(item.id)
+        : String(request.item || request.itemName || '').trim().toLowerCase() === normalizedItemName
+          || String(request.item || request.itemName || '').toLowerCase().includes(`(${String(item.id).toLowerCase()})`);
+      if (!matchesItem || getQuarterKey(request.date || request.createdAt) !== quarter) return total;
+      return total + getRequestQuantity(request.quantity);
+    }, 0);
+  }
+  function getQuarterlyRequestLimitRemaining(itemId, officeName) {
+    const item = getLocalRecords('items').find(entry => String(entry.id) === String(itemId));
+    if (!item) return 0;
+    return Math.max(0, quarterlyRequestLimit - getQuarterlyRequestUsage(item, officeName));
+  }
+  function updateRequestLimitHint() {
+    const requestForm = document.querySelector('#requestForm');
+    const limitHint = requestForm?.querySelector('[data-quarterly-request-limit]');
+    if (!requestForm || !limitHint) return;
+    const itemId = requestForm.querySelector('#requestItem')?.value;
+    const item = getLocalRecords('items').find(entry => String(entry.id) === String(itemId));
+    const officeName = requestForm.querySelector('#requestOffice')?.value;
+    if (!item || !officeName) {
+      limitHint.textContent = `Quarterly limit: ${quarterlyRequestLimit} units per item for each office.`;
+      return;
+    }
+    const remaining = getQuarterlyRequestLimitRemaining(item.id, officeName);
+    limitHint.textContent = `Quarterly limit: ${quarterlyRequestLimit} ${item.unit} per office for this item · ${remaining} ${item.unit} remaining this quarter. Pending, approved, and issued requests count.`;
+  }
   const modalId = {
     'inventory.html': 'addItemModal',
     'stock_request.html': 'requestModal',
@@ -163,6 +217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         const officeOverride = new URLSearchParams(location.search).get('office');
         if (officeOverride) requestForm.querySelector('#requestOffice').value = officeOverride;
+        updateRequestLimitHint();
       }
     }
     if (pageModal.id === 'addItemModal' && !pageModal.querySelector('#addItemForm').dataset.editingItem) {
@@ -908,6 +963,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (currentUser.role === 'end-user' && quantity > item.quantity) {
           return showToast(`Only ${item.quantity} ${item.unit} are currently available.`);
         }
+        const remainingQuarterlyQuantity = getQuarterlyRequestLimitRemaining(itemId, request.office);
+        if (quantity > remainingQuarterlyQuantity) {
+          return showToast(
+            `Quarterly limit exceeded. This office may request up to ${quarterlyRequestLimit} ${item.unit} of this item per quarter; ${remainingQuarterlyQuantity} ${item.unit} remain.`
+          );
+        }
         if (getLocalRecords('requests').some(savedRequest => savedRequest.id === request.id)) {
           return showToast(`${request.id} already exists.`);
         }
@@ -1010,7 +1071,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }, true);
   }
-  Object.assign(window.IMS, { createIcon, showToast });
+  Object.assign(window.IMS, {
+    createIcon,
+    showToast,
+    getQuarterlyRequestLimitRemaining,
+    quarterlyRequestLimit
+  });
   applyTailwindUtilities();
   buildSidebar();
   function updatePendingCount() {
@@ -1022,9 +1088,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   applyPreferences();
   setupActions();
   setupForms();
+  const requestForm = document.querySelector('#requestForm');
+  requestForm?.addEventListener('input', updateRequestLimitHint);
+  requestForm?.addEventListener('change', updateRequestLimitHint);
+  window.addEventListener('ims:records-updated', updateRequestLimitHint);
   if (new URLSearchParams(location.search).has('newRequest')) {
     window.setTimeout(() => openModal(), 0);
   }
   window.IMS.pageFeatures.forEach(initialize => initialize());
+  updateRequestLimitHint();
 })();
 });
