@@ -76,7 +76,7 @@
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div class="stat-card">
           <p class="text-cbsua-muted text-sm">Registered offices</p>
-          <p class="text-3xl font-bold mt-1" id="officeCount">41</p>
+          <p class="text-3xl font-bold mt-1" id="officeCount">42</p>
         </div>
         <div class="stat-card">
           <p class="text-cbsua-muted text-sm">Pending requests</p>
@@ -104,7 +104,7 @@
       </div>
 
       <div class="flex items-center justify-between mb-3">
-        <p class="text-sm text-cbsua-muted" id="officeResults">Showing 41 offices</p>
+        <p class="text-sm text-cbsua-muted" id="officeResults">Showing 42 offices</p>
         <button type="button" id="clearFilters" class="text-sm text-cbsua-primary font-medium hover:underline hidden">Clear filters</button>
       </div>
       <div id="officeGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
@@ -156,27 +156,49 @@
     });
 
     const offices = [
-      ["Accounting Office", "administrative"], ["Admission Office", "administrative"],
-      ["Alumni Office", "administrative"], ["Auxiliary Budget Office", "administrative"],
-      ["Bids and Awards Committee Office", "administrative"], ["Business Affairs Unit", "administrative"],
-      ["Campus PIO", "administrative"], ["Cashier's Office", "administrative"],
-      ["College of Engineering", "academic"], ["College of Information Technology", "academic"],
-      ["Clinic / Infirmary", "support"], ["College of Criminology", "academic"],
-      ["College of Education", "academic"], ["Commission on Audit", "administrative"],
-      ["College of Industrial Technology", "academic"], ["Curriculum and Instruction Division", "academic"],
-      ["Disaster Risk Readiness Management Office", "support"], ["Environmental Science and Agroforestry Program", "academic"],
-      ["Extension Services Unit", "academic"], ["Gender and Development Office", "support"],
-      ["General Administration and Support Services", "administrative"], ["Guidance and Counseling Unit", "support"],
-      ["Human Resource Management Office", "administrative"], ["Informations and Communications Technology Office", "support"],
-      ["Industry Linkages and Development Office", "administrative"], ["Institutional Planning and Development Office", "administrative"],
-      ["Library", "academic"], ["Motorpool", "support"], ["Office of Campus Administrator", "administrative"],
-      ["Office of the Student Affairs and Services", "administrative"], ["Physical Plant and Development Office", "support"],
-      ["Publication Office", "support"], ["Quality Assurance Office", "administrative"],
-      ["Reading Center", "academic"], ["Record's Office", "administrative"], ["Registrar's Office", "administrative"],
-      ["Research and Development Center", "academic"], ["ROTC / NSTP Office", "academic"],
-      ["Sentro ng Wika, Kultura at Sining", "academic"], ["Supply Office", "administrative"], ["UMIS", "support"]
-    ].sort((a, b) => a[0].localeCompare(b[0]))
-      .map((office, index) => [
+      ["Accounting Office", "administrative"],
+      ["Admission Office", "administrative"],
+      ["Alumni Office", "administrative"],
+      ["Auxiliary Office", "administrative"],
+      ["Budget Office", "administrative"],
+      ["Bids and Awards Committee Office", "administrative"],
+      ["Business Affairs Unit", "administrative"],
+      ["Campus PIO", "administrative"],
+      ["Cashier's Office", "administrative"],
+      ["College of Engineering", "academic"],
+      ["College of Information Technology", "academic"],
+      ["Clinic / Infirmary", "support"],
+      ["College of Criminology", "academic"],
+      ["College of Education", "academic"],
+      ["Commission on Audit", "administrative"],
+      ["College of Industrial Technology", "academic"],
+      ["Curriculum and Instruction Division", "academic"],
+      ["Disaster Risk Readiness Management Office", "support"],
+      ["Environmental Science and Agroforestry Program", "academic"],
+      ["Extension Services Unit", "academic"],
+      ["Gender and Development Office", "support"],
+      ["General Administration and Support Services", "administrative"],
+      ["Guidance and Counseling Unit", "support"],
+      ["Human Resource Management Office", "administrative"],
+      ["Informations and Communications Technology Office", "support"],
+      ["Industry Linkages and Development Office", "administrative"],
+      ["Institutional Planning and Development Office", "administrative"],
+      ["Library", "academic"],
+      ["Motorpool", "support"],
+      ["Office of Campus Administrator", "administrative"],
+      ["Office of the Student Affairs and Services", "administrative"],
+      ["Physical Plant and Development Office", "support"],
+      ["Publication Office", "support"],
+      ["Quality Assurance Office", "administrative"],
+      ["Reading Center", "academic"],
+      ["Record's Office", "administrative"],
+      ["Registrar's Office", "administrative"],
+      ["Research and Development Center", "academic"],
+      ["ROTC / NSTP Office", "academic"],
+      ["Sentro ng Wika, Kultura at Sining", "academic"],
+      ["Supply Office", "administrative"],
+      ["UMIS", "support"]
+    ].map((office, index) => [
         office[0],
         office[1],
         `OFF-${String(index + 1).padStart(3, "0")}`

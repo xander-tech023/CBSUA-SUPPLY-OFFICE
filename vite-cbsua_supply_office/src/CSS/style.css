@@ -29,6 +29,10 @@ body {
   color: #111827;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .login-layout {
   min-height: 100vh;
   min-height: 100svh;
