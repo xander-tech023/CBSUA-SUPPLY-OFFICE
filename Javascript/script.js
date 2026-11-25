@@ -890,11 +890,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (classificationKey === 'consumable') {
           classificationDetails.fundCluster = form.querySelector('#requestFundCluster').value.trim();
         } else if (classificationKey === 'semi-expendable') {
+          const specifications = form.querySelector('#requestIcsSpecifications').value.trim();
+          if (!specifications) return showToast('Enter the specifications required for the ICS request.');
           const usefulLifeText = form.querySelector('#requestUsefulLife').value.trim();
           const usefulLife = usefulLifeText ? Number(usefulLifeText) : null;
           if (usefulLifeText && (!Number.isFinite(usefulLife) || usefulLife < 1)) {
             return showToast('Estimated useful life must be at least one year.');
           }
+          classificationDetails.specifications = specifications;
           classificationDetails.estimatedUsefulLifeYears = usefulLife;
           const unitCostText = form.querySelector('#requestIcsUnitCost').value.trim();
           const unitCost = unitCostText ? Number(unitCostText) : null;

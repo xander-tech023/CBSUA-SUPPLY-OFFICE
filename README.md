@@ -19,4 +19,6 @@ Appearance preferences are local to the browser. Delivery attachments are not up
 
 The Stock Requests page exports its currently filtered rows as CSV. Issue Supplies can print an approved requisition gate pass and export a recorded receipt through the browser's print dialog; choose **Save as PDF** to create a PDF. Status messages appear as floating notifications.
 
-React and ReactDOM are included from jsDelivr and power the toast notification component. Tailwind CSS and Chart.js are also loaded from their CDNs, so use a network connection when opening the pages.
+Inventory's **Asset QR codes** page generates printable labels for issued ICS and PAR records. Scanning a label displays the MR holder, office, item specifications, and issuance details directly in the scanner. The QR contains a snapshot of those details, so regenerate the label after assignment or specification changes. Anyone with the QR can view its details.
+
+React and ReactDOM are included from jsDelivr and power the toast notification component. Tailwind CSS, Chart.js, and the QR code generator are loaded from their CDNs, so use a network connection when opening the pages.
