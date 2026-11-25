@@ -510,7 +510,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     if (currentPage === 'dashboard.html') {
       [['receipts', 'Received'], ['issuances', 'Issued']]
         .flatMap(([resource, type]) => getLocalRecords(resource).map(record => [record, type]))
-        .sort((left, right) => new Date(right[0].createdAt) - new Date(left[0].createdAt))
+        .sort((left, right) => new Date(left[0].createdAt) - new Date(right[0].createdAt))
         .forEach(([record, type]) => addTransactionRow(record, type));
       return;
     }
