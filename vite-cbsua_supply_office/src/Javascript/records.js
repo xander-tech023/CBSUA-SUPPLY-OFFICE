@@ -4,7 +4,10 @@ window.IMS = window.IMS || {};
 window.IMS.pageFeatures = window.IMS.pageFeatures || [];
 
 (() => {
-  const resources = ['items', 'requests', 'suppliers', 'receipts', 'issuances', 'categories'];
+  const resources = [
+    'items', 'requests', 'suppliers', 'receipts', 'issuances', 'categories',
+    'officeQuotas', 'itemAnnualBudgets'
+  ];
   const records = Object.fromEntries(resources.map(resource => [resource, []]));
   const _seedRecords = {
     items: [
@@ -201,6 +204,14 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
       requestId: request.id,
       record: request
     });
+  }
+
+  function setOfficeItemQuota(quota) {
+    if (window.IMS.currentUser?.role !== 'admin') {
+      window.IMS.showToast('Only an administrator can assign office request allocations.');
+      return null;
+    }
+    return runMutation('set-office-item-quota', quota);
   }
 
   async function updateRequestStatus(requestId, status) {
@@ -522,6 +533,7 @@ window.IMS.pageFeatures = window.IMS.pageFeatures || [];
     getRemainingRequestQuantity,
     saveRecord,
     updateRequest,
+    setOfficeItemQuota,
     updateRequestStatus,
     cancelRequest,
     updateInventoryItem,

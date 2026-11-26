@@ -8,6 +8,7 @@ window.IMS.pageFeatures.push(() => {
   const query = document.querySelector('main input[type="text"]');
   const office = document.querySelector('main select');
   const itemSelect = document.querySelector('#requestItem');
+  const quantityInput = document.querySelector('#requestQuantity');
   const idField = document.querySelector('#requestId');
   const exportButton = document.querySelector('[data-export-requests]');
   const adminCards = document.querySelector('#adminRequestCards');
@@ -34,8 +35,26 @@ window.IMS.pageFeatures.push(() => {
   formatOfficeOptions(office);
   const requestOfficeInput = document.querySelector('#requestOffice');
   if (requestOfficeInput) {
-    requestOfficeInput.value = 'Supply Office';
+    requestOfficeInput.value = new URLSearchParams(location.search).get('office') || 'Supply Office';
     requestOfficeInput.readOnly = true;
+  }
+
+  function getRequestableQuantity(itemId) {
+    return window.IMS.getQuarterlyRequestLimitRemaining(itemId, requestOfficeInput?.value || '');
+  }
+
+  function updateRequestQuantityLimit(items) {
+    if (!itemSelect || !quantityInput) return;
+    const item = items.find(entry => entry.id === itemSelect.value);
+    if (!item) {
+      quantityInput.removeAttribute('max');
+      return;
+    }
+    const maximum = Math.min(Number(item.quantity), getRequestableQuantity(item.id));
+    quantityInput.max = String(maximum);
+    if (maximum > 0 && Number(quantityInput.value) > maximum) {
+      quantityInput.value = String(maximum);
+    }
   }
 
   function refreshRequestForm() {
@@ -43,12 +62,13 @@ window.IMS.pageFeatures.push(() => {
       const previousValue = itemSelect.value;
       const selectedClassification = requestClassifications[requestForm?.dataset.supplyClassification];
       const items = getLocalRecords('items').filter(item => !selectedClassification
-        || String(item.supplyClassification || '').trim().toLowerCase() === selectedClassification.itemClassification);
+        || String(item.supplyClassification || '').trim().toLowerCase() === selectedClassification.itemClassification)
+        .filter(item => Number(item.quantity) > 0 && getRequestableQuantity(item.id) > 0);
       itemSelect.replaceChildren();
       items.forEach(item => {
         const option = document.createElement('option');
         option.value = item.id;
-        option.textContent = `${item.id} — ${item.name} (${item.quantity} ${item.unit} available)`;
+        option.textContent = `${item.id} — ${item.name} (${item.quantity} ${item.unit} available, ${getRequestableQuantity(item.id)} requestable)`;
         itemSelect.append(option);
       });
       if (itemSelect.options.length) {
@@ -59,11 +79,14 @@ window.IMS.pageFeatures.push(() => {
         const option = document.createElement('option');
         option.value = '';
         option.textContent = selectedClassification
-          ? `No ${selectedClassification.label} items available`
-          : 'No inventory items available';
+          ? `No ${selectedClassification.label} items have an available office allocation`
+          : 'No items have an available office allocation';
         itemSelect.append(option);
       }
       itemSelect.disabled = items.length === 0;
+      const submitButton = requestForm?.querySelector('button[type="submit"]');
+      if (submitButton) submitButton.disabled = items.length === 0;
+      updateRequestQuantityLimit(items);
     }
     if (idField) idField.value = nextRequestId();
   }
@@ -263,6 +286,9 @@ window.IMS.pageFeatures.push(() => {
   window.addEventListener('ims:records-updated', () => {
     refreshRequestForm();
     update();
+  });
+  itemSelect?.addEventListener('change', () => {
+    updateRequestQuantityLimit(getLocalRecords('items'));
   });
   window.addEventListener('ims:request-classification-changed', refreshRequestForm);
   refreshRequestForm();

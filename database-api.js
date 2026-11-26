@@ -161,6 +161,23 @@ function requestedQuantity(value) {
   return quantity;
 }
 
+function allocationInteger(value, label, { minimum = 0 } = {}) {
+  if (value === null || value === undefined || String(value).trim() === '') {
+    throw new ApiError(400, `${label} is required.`);
+  }
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < minimum) {
+    throw new ApiError(400, `${label} must be a whole number of at least ${minimum}.`);
+  }
+  return number;
+}
+
+function quarterlyAllocation(annualLimit, quarter) {
+  const base = Math.floor(annualLimit / 4);
+  const remainder = annualLimit % 4;
+  return base + (quarter <= remainder ? 1 : 0);
+}
+
 function makeReference(prefix, year, month, number) {
   return `${prefix}-${year}-${month}-${String(number).padStart(3, '0')}`;
 }
@@ -269,6 +286,121 @@ async function getItemByCode(connection, code, lock = false) {
   return rows[0];
 }
 
+async function enforceOfficeItemQuota(connection, officeId, item, quantity, year, quarter, excludedRequestId = null) {
+  const [quotaRows] = await connection.execute(
+    `SELECT annual_limit FROM office_item_request_quotas
+      WHERE office_id = ? AND item_id = ? AND allocation_year = ? FOR UPDATE`,
+    [officeId, item.id, year]
+  );
+  if (!quotaRows[0]) {
+    throw new ApiError(409, `No ${year} request allocation has been assigned to this office for ${item.name}.`);
+  }
+
+  const annualLimit = Number(quotaRows[0].annual_limit);
+  const quarterLimit = quarterlyAllocation(annualLimit, quarter);
+  const exclusion = excludedRequestId === null ? '' : ' AND id <> ?';
+  const usageParameters = [quarter, officeId, item.id, year];
+  if (excludedRequestId !== null) usageParameters.push(excludedRequestId);
+  const [usageRows] = await connection.execute(
+    `SELECT COALESCE(SUM(quantity), 0) AS annual_used,
+            COALESCE(SUM(CASE WHEN QUARTER(created_at) = ? THEN quantity ELSE 0 END), 0) AS quarter_used
+       FROM stock_requests
+      WHERE office_id = ? AND item_id = ? AND YEAR(created_at) = ?
+        AND status NOT IN ('Rejected', 'Cancelled')${exclusion}`,
+    usageParameters
+  );
+  const annualUsed = Number(usageRows[0].annual_used);
+  const quarterUsed = Number(usageRows[0].quarter_used);
+  if (annualUsed + quantity > annualLimit) {
+    throw new ApiError(409,
+      `The annual allocation for ${item.name} is ${annualLimit} ${item.unit}; ${Math.max(0, annualLimit - annualUsed)} remain.`);
+  }
+  if (quarterUsed + quantity > quarterLimit) {
+    throw new ApiError(409,
+      `The Q${quarter} allocation for ${item.name} is ${quarterLimit} ${item.unit}; ${Math.max(0, quarterLimit - quarterUsed)} remain.`);
+  }
+}
+
+async function setOfficeItemQuota(connection, record, user) {
+  if (user.role !== 'admin') {
+    throw new ApiError(403, 'Only an administrator can assign office request allocations.');
+  }
+  const [calendarRows] = await connection.execute(
+    'SELECT YEAR(CURRENT_DATE()) AS allocation_year'
+  );
+  const year = allocationInteger(record.year, 'Allocation year', { minimum: 2000 });
+  if (year !== Number(calendarRows[0].allocation_year)) {
+    throw new ApiError(400, 'Allocations can only be changed for the current year.');
+  }
+  const annualBudget = allocationInteger(record.annualBudget, 'Campus annual budget');
+  const officeAnnualLimit = allocationInteger(record.officeAnnualLimit, 'Office annual allocation');
+  if (officeAnnualLimit > annualBudget) {
+    throw new ApiError(400, 'An office allocation cannot exceed the campus annual budget.');
+  }
+
+  const item = await getItemByCode(connection, record.itemId, true);
+  const [officeRows] = await connection.execute(
+    'SELECT id, name FROM offices WHERE office_code = ? AND is_active = 1 FOR UPDATE',
+    [String(record.officeId || '')]
+  );
+  if (!officeRows[0]) throw new ApiError(400, 'Choose a valid active office.');
+  const office = officeRows[0];
+
+  await connection.execute(
+    `INSERT INTO item_annual_request_budgets (item_id, allocation_year, annual_limit, updated_by)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE annual_limit = VALUES(annual_limit), updated_by = VALUES(updated_by)`,
+    [item.id, year, annualBudget, user.id]
+  );
+  const [budgetRows] = await connection.execute(
+    `SELECT annual_limit FROM item_annual_request_budgets
+      WHERE item_id = ? AND allocation_year = ? FOR UPDATE`,
+    [item.id, year]
+  );
+  const [otherAllocationRows] = await connection.execute(
+    `SELECT COALESCE(SUM(annual_limit), 0) AS allocated
+       FROM office_item_request_quotas
+      WHERE item_id = ? AND allocation_year = ? AND office_id <> ?`,
+    [item.id, year, office.id]
+  );
+  const totalAllocated = Number(otherAllocationRows[0].allocated) + officeAnnualLimit;
+  if (totalAllocated > Number(budgetRows[0].annual_limit)) {
+    throw new ApiError(409,
+      `This would allocate ${totalAllocated} ${item.unit}, exceeding the campus budget of ${Number(budgetRows[0].annual_limit)}.`);
+  }
+
+  await connection.execute(
+    `SELECT annual_limit FROM office_item_request_quotas
+      WHERE office_id = ? AND item_id = ? AND allocation_year = ? FOR UPDATE`,
+    [office.id, item.id, year]
+  );
+  await connection.execute(
+    `INSERT INTO office_item_request_quotas
+      (office_id, item_id, allocation_year, annual_limit, updated_by)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE annual_limit = VALUES(annual_limit), updated_by = VALUES(updated_by)`,
+    [office.id, item.id, year, officeAnnualLimit, user.id]
+  );
+  const [usageRows] = await connection.execute(
+    `SELECT COALESCE(SUM(quantity), 0) AS annual_used,
+            COALESCE(SUM(CASE WHEN QUARTER(created_at) = 1 THEN quantity ELSE 0 END), 0) AS q1_used,
+            COALESCE(SUM(CASE WHEN QUARTER(created_at) = 2 THEN quantity ELSE 0 END), 0) AS q2_used,
+            COALESCE(SUM(CASE WHEN QUARTER(created_at) = 3 THEN quantity ELSE 0 END), 0) AS q3_used,
+            COALESCE(SUM(CASE WHEN QUARTER(created_at) = 4 THEN quantity ELSE 0 END), 0) AS q4_used
+       FROM stock_requests
+      WHERE office_id = ? AND item_id = ? AND YEAR(created_at) = ?
+        AND status NOT IN ('Rejected', 'Cancelled')`,
+    [office.id, item.id, year]
+  );
+  const usage = usageRows[0];
+  if (Number(usage.annual_used) > officeAnnualLimit
+    || [1, 2, 3, 4].some(quarter =>
+      Number(usage[`q${quarter}_used`]) > quarterlyAllocation(officeAnnualLimit, quarter))) {
+    throw new ApiError(409, 'The new allocation cannot be lower than requests already recorded for this office and item.');
+  }
+  return `${office.office_code}:${item.item_code}:${year}`;
+}
+
 async function saveCategory(connection, record) {
   const category = await insertCategory(connection, record.name);
   return category.category_code;
@@ -339,6 +471,9 @@ async function saveSupplier(connection, record) {
 async function saveRequest(connection, record, user) {
   const item = await getItemByCode(connection, record.itemId, true);
   const quantity = requestedQuantity(record.quantity);
+  if (!Number.isSafeInteger(quantity)) {
+    throw new ApiError(400, 'Enter a whole-number request quantity.');
+  }
   if (user.role === 'end-user' && quantity > Number(item.quantity_on_hand)) {
     throw new ApiError(409, `Only ${Number(item.quantity_on_hand)} ${item.unit} are currently available.`);
   }
@@ -360,22 +495,16 @@ async function saveRequest(connection, record, user) {
   }
 
   const requestDate = dateOnly(record.date, 'Request date');
+  const [quotaPeriodRows] = await connection.execute(
+    'SELECT YEAR(CURRENT_DATE()) AS allocation_year, QUARTER(CURRENT_DATE()) AS allocation_quarter'
+  );
+  await enforceOfficeItemQuota(
+    connection, office.id, item, quantity,
+    Number(quotaPeriodRows[0].allocation_year), Number(quotaPeriodRows[0].allocation_quarter)
+  );
   const date = new Date(`${requestDate}T00:00:00Z`);
   const year = String(date.getUTCFullYear());
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const quarterStartMonth = Math.floor(date.getUTCMonth() / 3) * 3;
-  const quarterStart = `${year}-${String(quarterStartMonth + 1).padStart(2, '0')}-01`;
-  const quarterEndDate = new Date(Date.UTC(date.getUTCFullYear(), quarterStartMonth + 3, 0));
-  const quarterEnd = quarterEndDate.toISOString().slice(0, 10);
-  const [usageRows] = await connection.execute(
-    `SELECT COALESCE(SUM(quantity), 0) AS total FROM stock_requests
-      WHERE office_id = ? AND item_id = ? AND request_date BETWEEN ? AND ?
-        AND status NOT IN ('Rejected', 'Cancelled')`,
-    [office.id, item.id, quarterStart, quarterEnd]
-  );
-  if (Number(usageRows[0].total) + quantity > 40) {
-    throw new ApiError(409, 'The quarterly limit of 40 units per item and office would be exceeded.');
-  }
 
   const requestNumber = await nextCodeNumber(
     connection, `REQ-${year}-${month}`, 'stock_requests', 'request_code', `REQ-${year}-${month}-`
@@ -426,7 +555,8 @@ async function updatePendingRequest(connection, requestCode, record, user) {
     throw new ApiError(403, 'Only end-users can edit their own pending requests.');
   }
   const [requestRows] = await connection.execute(
-    `SELECT id, request_date, office_id, requester_id, status
+    `SELECT id, request_date, office_id, requester_id, status,
+            YEAR(created_at) AS allocation_year, QUARTER(created_at) AS allocation_quarter
        FROM stock_requests WHERE request_code = ? FOR UPDATE`,
     [String(requestCode || '')]
   );
@@ -460,22 +590,11 @@ async function updatePendingRequest(connection, requestCode, record, user) {
     throw new ApiError(400, 'The selected inventory item does not match the supply classification.');
   }
 
-  const requestDate = dateOnly(request.request_date, 'Request date');
-  const date = new Date(`${requestDate}T00:00:00Z`);
-  const year = String(date.getUTCFullYear());
-  const quarterStartMonth = Math.floor(date.getUTCMonth() / 3) * 3;
-  const quarterStart = `${year}-${String(quarterStartMonth + 1).padStart(2, '0')}-01`;
-  const quarterEndDate = new Date(Date.UTC(date.getUTCFullYear(), quarterStartMonth + 3, 0));
-  const quarterEnd = quarterEndDate.toISOString().slice(0, 10);
-  const [usageRows] = await connection.execute(
-    `SELECT COALESCE(SUM(quantity), 0) AS total FROM stock_requests
-      WHERE office_id = ? AND item_id = ? AND request_date BETWEEN ? AND ?
-        AND status NOT IN ('Rejected', 'Cancelled') AND id <> ?`,
-    [office.id, item.id, quarterStart, quarterEnd, request.id]
+  dateOnly(request.request_date, 'Request date');
+  await enforceOfficeItemQuota(
+    connection, office.id, item, quantity,
+    Number(request.allocation_year), Number(request.allocation_quarter), request.id
   );
-  if (Number(usageRows[0].total) + quantity > 40) {
-    throw new ApiError(409, 'The quarterly limit of 40 units per item and office would be exceeded.');
-  }
 
   const details = record.classificationDetails && typeof record.classificationDetails === 'object'
     && !Array.isArray(record.classificationDetails)
@@ -747,7 +866,7 @@ function inventoryStatus(item) {
 }
 
 async function readRecords(pool, user) {
-  const [items, requests, suppliers, receipts, issuances, categories] = await Promise.all([
+  const [items, requests, suppliers, receipts, issuances, categories, quotas, annualBudgets] = await Promise.all([
     pool.execute(
       `SELECT i.*, c.name AS category, s.name AS supplier
          FROM inventory_items i
@@ -800,6 +919,44 @@ async function readRecords(pool, user) {
     ),
     pool.execute(
       'SELECT category_code, name FROM item_categories WHERE is_active = 1 ORDER BY id'
+    ),
+    pool.execute(
+      `SELECT q.office_id, q.item_id, q.allocation_year, q.annual_limit,
+              o.office_code, o.name AS office, i.item_code, i.name AS item_name, i.unit,
+              b.annual_limit AS campus_annual_budget,
+              COALESCE(SUM(r.quantity), 0) AS annual_used,
+              COALESCE(SUM(CASE WHEN QUARTER(r.created_at) = 1 THEN r.quantity ELSE 0 END), 0) AS q1_used,
+              COALESCE(SUM(CASE WHEN QUARTER(r.created_at) = 2 THEN r.quantity ELSE 0 END), 0) AS q2_used,
+              COALESCE(SUM(CASE WHEN QUARTER(r.created_at) = 3 THEN r.quantity ELSE 0 END), 0) AS q3_used,
+              COALESCE(SUM(CASE WHEN QUARTER(r.created_at) = 4 THEN r.quantity ELSE 0 END), 0) AS q4_used,
+              QUARTER(CURRENT_DATE()) AS current_quarter
+         FROM office_item_request_quotas q
+         JOIN offices o ON o.id = q.office_id
+         JOIN inventory_items i ON i.id = q.item_id
+         JOIN item_annual_request_budgets b
+           ON b.item_id = q.item_id AND b.allocation_year = q.allocation_year
+         LEFT JOIN stock_requests r
+           ON r.office_id = q.office_id AND r.item_id = q.item_id
+          AND YEAR(r.created_at) = q.allocation_year
+          AND r.status NOT IN ('Rejected', 'Cancelled')
+        WHERE ((? <> 'end-user' AND q.allocation_year = YEAR(CURRENT_DATE()))
+          OR (? = 'end-user' AND o.name = ?))
+        GROUP BY q.office_id, q.item_id, q.allocation_year, q.annual_limit,
+                 o.office_code, o.name, i.item_code, i.name, i.unit, b.annual_limit
+        ORDER BY o.name, i.name`,
+      [user.role, user.role, user.office || '']
+    ),
+    pool.execute(
+      `SELECT b.item_id, b.allocation_year, b.annual_limit,
+              i.item_code, i.name AS item_name, i.unit,
+              COALESCE(SUM(q.annual_limit), 0) AS allocated
+         FROM item_annual_request_budgets b
+         JOIN inventory_items i ON i.id = b.item_id
+         LEFT JOIN office_item_request_quotas q
+           ON q.item_id = b.item_id AND q.allocation_year = b.allocation_year
+        WHERE b.allocation_year = YEAR(CURRENT_DATE())
+        GROUP BY b.item_id, b.allocation_year, b.annual_limit, i.item_code, i.name, i.unit
+        ORDER BY i.name`
     )
   ]);
   const mappedItems = items[0].map(item => ({
@@ -905,6 +1062,38 @@ async function readRecords(pool, user) {
     remarks: issuance.remarks || '',
     createdAt: issuance.created_at
   }));
+  const mappedQuotas = quotas[0].map(quota => {
+    const annualLimit = Number(quota.annual_limit);
+    const quarterUsage = [quota.q1_used, quota.q2_used, quota.q3_used, quota.q4_used]
+      .map(value => Number(value));
+    const currentQuarter = Number(quota.current_quarter);
+    return {
+      id: `${quota.office_code}:${quota.item_code}:${quota.allocation_year}`,
+      officeId: quota.office_code,
+      office: quota.office,
+      itemId: quota.item_code,
+      itemName: quota.item_name,
+      unit: quota.unit,
+      year: Number(quota.allocation_year),
+      annualLimit,
+      annualUsed: Number(quota.annual_used),
+      quarterLimits: [1, 2, 3, 4].map(quarter => quarterlyAllocation(annualLimit, quarter)),
+      quarterUsage,
+      currentQuarter,
+      currentQuarterLimit: quarterlyAllocation(annualLimit, currentQuarter),
+      currentQuarterUsed: quarterUsage[currentQuarter - 1],
+      campusAnnualBudget: Number(quota.campus_annual_budget)
+    };
+  });
+  const mappedAnnualBudgets = annualBudgets[0].map(budget => ({
+    id: `${budget.item_code}:${budget.allocation_year}`,
+    itemId: budget.item_code,
+    itemName: budget.item_name,
+    unit: budget.unit,
+    year: Number(budget.allocation_year),
+    annualBudget: Number(budget.annual_limit),
+    allocated: Number(budget.allocated)
+  }));
   return {
     items: mappedItems,
     requests: mappedRequests,
@@ -913,7 +1102,9 @@ async function readRecords(pool, user) {
     issuances: user.role === 'end-user' ? [] : mappedIssuances,
     categories: user.role === 'end-user'
       ? []
-      : categories[0].map(category => ({ id: category.category_code, name: category.name }))
+      : categories[0].map(category => ({ id: category.category_code, name: category.name })),
+    officeQuotas: mappedQuotas,
+    itemAnnualBudgets: user.role === 'end-user' ? [] : mappedAnnualBudgets
   };
 }
 
@@ -1100,7 +1291,8 @@ function registerDatabaseApi(app, pool) {
 
   app.post('/api/records/mutation', authenticated, route(async (request, response) => {
     const { action, payload = {} } = request.body || {};
-    if (!['save-record', 'update-record', 'update-request-status', 'update-pending-request', 'cancel-request'].includes(action)) {
+    if (!['save-record', 'update-record', 'update-request-status', 'update-pending-request',
+      'cancel-request', 'set-office-item-quota'].includes(action)) {
       throw new ApiError(400, 'Unknown record operation.');
     }
     let resource = '';
@@ -1144,6 +1336,9 @@ function registerDatabaseApi(app, pool) {
         resource = 'requests';
         savedId = String(payload.requestId || '');
         await updatePendingRequest(connection, savedId, payload.record || {}, request.user);
+      } else if (action === 'set-office-item-quota') {
+        resource = 'officeQuotas';
+        savedId = await setOfficeItemQuota(connection, payload, request.user);
       } else {
         resource = 'requests';
         savedId = String(payload.requestId || '');

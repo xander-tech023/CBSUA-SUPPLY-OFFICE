@@ -122,6 +122,14 @@
         </article>
       </section>
 
+      <section id="officeItemAllocations" class="stat-card mb-6">
+        <div class="mb-4">
+          <h3 class="text-lg font-semibold">My office item allocations</h3>
+          <p class="text-sm text-cbsua-muted">Annual item allocations are divided as evenly as possible across four quarters. Pending, approved, and issued requests count toward usage.</p>
+        </div>
+        <div id="officeItemAllocationList" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-live="polite"></div>
+      </section>
+
       <section id="availableItems" class="stat-card mb-6">
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -218,7 +226,7 @@
         <div>
           <label class="mb-2 block font-medium" for="requestQuantity">Requested quantity *</label>
           <input id="requestQuantity" type="number" min="1" step="1" value="1" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" required />
-          <p data-quarterly-request-limit class="mt-1 text-xs text-cbsua-muted" aria-live="polite">Quarterly limit: 40 units per item for each office.</p>
+          <p data-quarterly-request-limit class="mt-1 text-xs text-cbsua-muted" aria-live="polite">Quarterly request limits are assigned by the administrator for each office and item.</p>
         </div>
         <div>
           <label class="mb-2 block font-medium" for="requestRemarks">Purpose / Remarks</label>

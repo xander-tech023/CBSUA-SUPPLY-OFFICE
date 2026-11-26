@@ -121,40 +121,43 @@
     </div>
   </div>
 
+  <div id="officeQuotaModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="officeQuotaTitle">
+    <div class="w-full max-w-xl rounded-xl bg-white p-6 shadow-xl">
+      <div class="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h3 id="officeQuotaTitle" class="text-xl font-bold">Manage office item allocation</h3>
+          <p id="officeQuotaOffice" class="mt-1 text-sm text-cbsua-muted"></p>
+        </div>
+        <button type="button" data-close-office-quota class="text-cbsua-muted hover:text-black" aria-label="Close allocation settings">✕</button>
+      </div>
+      <form id="officeQuotaForm" class="space-y-4">
+        <input id="officeQuotaOfficeId" type="hidden" />
+        <div>
+          <label for="officeQuotaItem" class="mb-2 block font-medium">Inventory item</label>
+          <select id="officeQuotaItem" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" required></select>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="officeQuotaCampusBudget" class="mb-2 block font-medium">Campus annual budget</label>
+            <input id="officeQuotaCampusBudget" type="number" min="0" step="1" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" required />
+            <p class="mt-1 text-xs text-cbsua-muted">Total units available to allocate across all offices this year.</p>
+          </div>
+          <div>
+            <label for="officeQuotaAnnualLimit" class="mb-2 block font-medium">This office's annual allocation</label>
+            <input id="officeQuotaAnnualLimit" type="number" min="0" step="1" class="w-full rounded-lg border border-cbsua-border px-4 py-2.5" required />
+            <p class="mt-1 text-xs text-cbsua-muted">Split as evenly as possible across four quarters.</p>
+          </div>
+        </div>
+        <p id="officeQuotaSummary" class="rounded-lg bg-gray-50 p-3 text-sm text-cbsua-muted" aria-live="polite"></p>
+        <div class="flex justify-end gap-3">
+          <button type="button" data-close-office-quota class="rounded-lg border border-cbsua-border px-4 py-2 font-medium hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="rounded-lg bg-cbsua-primary px-4 py-2 font-medium text-white hover:bg-green-700">Save allocation</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
-    const officesMenuButton = document.createElement("button");
-    officesMenuButton.type = "button";
-    officesMenuButton.className = "ims-menu-toggle fixed left-3 top-3 z-[80] grid h-11 w-11 place-items-center rounded-lg border border-gray-300 bg-white text-cbsua-dark shadow lg:hidden";
-    officesMenuButton.setAttribute("aria-label", "Open workspace menu");
-    officesMenuButton.setAttribute("aria-controls", "sidebar");
-    officesMenuButton.setAttribute("aria-expanded", "false");
-    officesMenuButton.innerHTML = '<svg viewBox="0 0 24 24" class="h-5 w-5 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>';
-    document.body.appendChild(officesMenuButton);
-
-    const officesMenuBackdrop = document.createElement("div");
-    officesMenuBackdrop.className = "ims-menu-backdrop fixed inset-0 z-30 hidden bg-slate-900/45 lg:hidden";
-    officesMenuBackdrop.setAttribute("aria-hidden", "true");
-    document.querySelector("main").before(officesMenuBackdrop);
-
-    function setOfficesMenuOpen(open) {
-      const sidebar = document.getElementById("sidebar");
-      sidebar.classList.toggle("-translate-x-full", !open);
-      officesMenuBackdrop.classList.toggle("hidden", !open);
-      officesMenuButton.setAttribute("aria-expanded", String(open));
-      officesMenuButton.setAttribute("aria-label", open ? "Close workspace menu" : "Open workspace menu");
-      officesMenuButton.innerHTML = open
-        ? '<svg viewBox="0 0 24 24" class="h-5 w-5 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>'
-        : '<svg viewBox="0 0 24 24" class="h-5 w-5 fill-none stroke-current stroke-[1.8]" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>';
-    }
-
-    officesMenuButton.addEventListener("click", () => {
-      setOfficesMenuOpen(officesMenuButton.getAttribute("aria-expanded") !== "true");
-    });
-    officesMenuBackdrop.addEventListener("click", () => setOfficesMenuOpen(false));
-    document.querySelectorAll("#sidebar a[href]").forEach(link => {
-      link.addEventListener("click", () => setOfficesMenuOpen(false));
-    });
-
     const offices = [
       ["Accounting Office", "administrative"],
       ["Admission Office", "administrative"],
@@ -212,6 +215,12 @@
     const activityModal = document.getElementById("officeActivityModal");
     const activityTitle = document.getElementById("officeActivityTitle");
     const activityContent = document.getElementById("officeActivityContent");
+    const quotaModal = document.getElementById("officeQuotaModal");
+    const quotaForm = document.getElementById("officeQuotaForm");
+    const quotaSummary = document.getElementById("officeQuotaSummary");
+    const quotaItemSelect = document.getElementById("officeQuotaItem");
+    const quotaBudgetInput = document.getElementById("officeQuotaCampusBudget");
+    const quotaOfficeLimitInput = document.getElementById("officeQuotaAnnualLimit");
     const officeAliases = {
       "Registrar's Office": ["Registrar"],
       "Clinic / Infirmary": ["Campus Health Services", "Clinic"]
@@ -224,6 +233,37 @@
       element.className = className;
       element.textContent = text;
       return element;
+    }
+
+    function renderOfficeQuotaSummaries() {
+      const currentYear = new Date().getFullYear();
+      const currentQuarter = Math.floor(new Date().getMonth() / 3) + 1;
+      const quotas = window.IMS?.getLocalRecords("officeQuotas") || [];
+      grid.querySelectorAll("[data-office-quota-summary]").forEach(container => {
+        const officeCard = container.closest("[data-office-code]");
+        const officeId = officeCard?.dataset.officeCode;
+        const officeQuotas = quotas.filter(quota => quota.officeId === officeId
+          && Number(quota.year) === currentYear);
+        container.replaceChildren();
+        if (!officeQuotas.length) {
+          container.append(createActivityElement("p", "text-xs text-cbsua-muted",
+            "No item allocations assigned for this year."));
+          return;
+        }
+        officeQuotas.slice(0, 3).forEach(quota => {
+          const itemLine = createActivityElement("div", "flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs");
+          itemLine.append(
+            createActivityElement("span", "font-medium", quota.itemName),
+            createActivityElement("span", "text-cbsua-muted",
+              `Q${currentQuarter}: ${quota.currentQuarterUsed}/${quota.currentQuarterLimit} ${quota.unit} · Annual ${quota.annualUsed}/${quota.annualLimit} ${quota.unit}`)
+          );
+          container.append(itemLine);
+        });
+        if (officeQuotas.length > 3) {
+          container.append(createActivityElement("p", "text-xs text-cbsua-muted",
+            `+ ${officeQuotas.length - 3} more item allocation${officeQuotas.length - 3 === 1 ? "" : "s"}`));
+        }
+      });
     }
 
     function closeOfficeActivity() {
@@ -324,8 +364,11 @@
       grid.innerHTML = visible.map(([name, type, officeId]) => {
         const initials = name.split(/[\s/]+/).filter(Boolean).slice(0, 2).map(word => word[0]).join("").replace(/[^A-Z]/gi, "").toUpperCase();
         const label = type.charAt(0).toUpperCase() + type.slice(1);
+        const allocationAction = window.IMS?.currentUser?.role === "admin"
+          ? `<button type="button" class="office-quota-manage text-cbsua-primary font-medium hover:underline" data-office="${name}" data-office-id="${officeId}">Manage item allocations</button>`
+          : "";
         return `
-          <article class="stat-card hover:border-cbsua-primary/40 transition-colors">
+          <article class="stat-card hover:border-cbsua-primary/40 transition-colors" data-office-code="${officeId}">
             <div class="flex items-start gap-3">
               <div class="shrink-0 w-11 h-11 rounded-lg bg-cbsua-light text-cbsua-primary flex items-center justify-center font-bold">${initials || "O"}</div>
               <div class="min-w-0 flex-1">
@@ -337,15 +380,101 @@
               </div>
               <span class="text-xs text-cbsua-muted whitespace-nowrap">Active</span>
             </div>
+            <div data-office-quota-summary class="mt-4 space-y-2 border-t border-cbsua-border pt-3"></div>
             <div class="mt-4 pt-3 border-t border-cbsua-border flex items-center justify-between gap-3 text-sm">
               <button type="button" class="office-details text-cbsua-primary font-medium hover:underline" data-office="${name}">Recent activity →</button>
               <button type="button" class="office-request text-cbsua-primary font-medium hover:underline" data-office="${name}">Request supply →</button>
             </div>
+            ${allocationAction ? `<div class="mt-3 text-right text-sm">${allocationAction}</div>` : ""}
           </article>`;
       }).join("");
+      renderOfficeQuotaSummaries();
 
       results.textContent = `Showing ${visible.length} ${visible.length === 1 ? "office" : "offices"}`;
       clear.classList.toggle("hidden", !query && category === "all");
+    }
+
+    function currentOfficeQuota() {
+      const currentYear = new Date().getFullYear();
+      return (window.IMS?.getLocalRecords("officeQuotas") || []).find(quota =>
+        quota.officeId === document.getElementById("officeQuotaOfficeId").value
+        && quota.itemId === quotaItemSelect.value
+        && Number(quota.year) === currentYear);
+    }
+
+    function updateQuotaFormSummary() {
+      if (!quotaSummary) return;
+      const itemId = quotaItemSelect.value;
+      const officeId = document.getElementById("officeQuotaOfficeId").value;
+      const currentYear = new Date().getFullYear();
+      const items = window.IMS?.getLocalRecords("items") || [];
+      const budgets = window.IMS?.getLocalRecords("itemAnnualBudgets") || [];
+      const quotas = window.IMS?.getLocalRecords("officeQuotas") || [];
+      const item = items.find(entry => entry.id === itemId);
+      if (!item) {
+        quotaSummary.textContent = "Choose an item to view its allocation.";
+        return;
+      }
+      const currentBudget = budgets.find(budget => budget.itemId === itemId
+        && Number(budget.year) === currentYear);
+      const currentQuota = currentOfficeQuota();
+      const campusBudget = Number(quotaBudgetInput.value);
+      const officeLimit = Number(quotaOfficeLimitInput.value);
+      const totalAllocated = currentBudget?.allocated
+        ?? quotas.filter(quota => quota.itemId === itemId && Number(quota.year) === currentYear)
+          .reduce((total, quota) => total + Number(quota.annualLimit), 0);
+      const allocatedElsewhere = Math.max(0, totalAllocated - Number(currentQuota?.annualLimit || 0));
+      const remainingCampusBudget = Math.max(0, campusBudget - allocatedElsewhere - officeLimit);
+      const quarterLimits = [1, 2, 3, 4].map(quarter =>
+        Math.floor(officeLimit / 4) + (quarter <= officeLimit % 4 ? 1 : 0));
+      quotaSummary.textContent = `Already allocated to other offices: ${allocatedElsewhere} ${item.unit}. `
+        + `After saving, ${allocatedElsewhere + officeLimit} of ${campusBudget || 0} ${item.unit} will be assigned; `
+        + `${remainingCampusBudget} ${item.unit} will remain. Quarterly limits: `
+        + quarterLimits.map((limit, index) => `Q${index + 1} ${limit}`).join(" · ") + ".";
+    }
+
+    function openOfficeQuota(officeName, officeId) {
+      if (window.IMS?.currentUser?.role !== "admin") return;
+      const items = window.IMS.getLocalRecords("items");
+      const selectedItemId = quotaItemSelect.value;
+      quotaItemSelect.replaceChildren(...items.map(item => {
+        const option = document.createElement("option");
+        option.value = item.id;
+        option.textContent = `${item.name} (${item.id}) · ${item.unit}`;
+        return option;
+      }));
+      if (items.some(item => item.id === selectedItemId)) quotaItemSelect.value = selectedItemId;
+      document.getElementById("officeQuotaOfficeId").value = officeId;
+      document.getElementById("officeQuotaOffice").textContent = `${officeName} · ${officeId}`;
+      const budget = window.IMS.getLocalRecords("itemAnnualBudgets")
+        .find(entry => entry.itemId === quotaItemSelect.value);
+      const quota = (window.IMS.getLocalRecords("officeQuotas") || [])
+        .find(entry => entry.officeId === officeId && entry.itemId === quotaItemSelect.value);
+      quotaBudgetInput.value = budget?.annualBudget ?? quota?.campusAnnualBudget ?? "";
+      quotaOfficeLimitInput.value = quota?.annualLimit ?? "";
+      quotaModal.classList.remove("hidden");
+      quotaModal.classList.add("flex");
+      updateQuotaFormSummary();
+      quotaItemSelect.focus();
+    }
+
+    function closeOfficeQuota() {
+      quotaModal.classList.add("hidden");
+      quotaModal.classList.remove("flex");
+    }
+
+    function updateOfficeQuotaItem() {
+      const year = new Date().getFullYear();
+      const itemId = quotaItemSelect.value;
+      const officeId = document.getElementById("officeQuotaOfficeId").value;
+      const budget = (window.IMS.getLocalRecords("itemAnnualBudgets") || [])
+        .find(entry => entry.itemId === itemId && Number(entry.year) === year);
+      const quota = (window.IMS.getLocalRecords("officeQuotas") || [])
+        .find(entry => entry.officeId === officeId && entry.itemId === itemId
+          && Number(entry.year) === year);
+      quotaBudgetInput.value = budget?.annualBudget ?? quota?.campusAnnualBudget ?? "";
+      quotaOfficeLimitInput.value = quota?.annualLimit ?? "";
+      updateQuotaFormSummary();
     }
 
     search.addEventListener("input", renderOffices);
@@ -360,6 +489,11 @@
       window.location.href = "stock_request.html?newRequest=1";
     });
     grid.addEventListener("click", event => {
+      const quotaButton = event.target.closest(".office-quota-manage");
+      if (quotaButton) {
+        openOfficeQuota(quotaButton.dataset.office, quotaButton.dataset.officeId);
+        return;
+      }
       const button = event.target.closest(".office-request");
       if (button) {
         window.location.href = `stock_request.html?newRequest=1&office=${encodeURIComponent(button.dataset.office)}`;
@@ -367,6 +501,56 @@
       }
       const detailsButton = event.target.closest(".office-details");
       if (detailsButton) showOfficeActivity(detailsButton.dataset.office, detailsButton);
+    });
+
+    quotaItemSelect.addEventListener("change", updateOfficeQuotaItem);
+    quotaBudgetInput.addEventListener("input", updateQuotaFormSummary);
+    quotaOfficeLimitInput.addEventListener("input", updateQuotaFormSummary);
+    quotaModal.querySelectorAll("[data-close-office-quota]").forEach(button => {
+      button.addEventListener("click", closeOfficeQuota);
+    });
+    quotaForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (window.IMS?.currentUser?.role !== "admin") return;
+      if (!quotaForm.reportValidity()) return;
+      const itemId = quotaItemSelect.value;
+      const officeId = document.getElementById("officeQuotaOfficeId").value;
+      const annualBudget = Number(quotaBudgetInput.value);
+      const officeAnnualLimit = Number(quotaOfficeLimitInput.value);
+      if (!Number.isSafeInteger(annualBudget) || annualBudget < 0
+        || !Number.isSafeInteger(officeAnnualLimit) || officeAnnualLimit < 0) {
+        return window.IMS.showToast("Enter whole-number annual budgets and allocations.");
+      }
+      const budget = (window.IMS.getLocalRecords("itemAnnualBudgets") || [])
+        .find(entry => entry.itemId === itemId && Number(entry.year) === new Date().getFullYear());
+      const quota = currentOfficeQuota();
+      const allocated = budget?.allocated
+        ?? (window.IMS.getLocalRecords("officeQuotas") || [])
+          .filter(entry => entry.itemId === itemId && Number(entry.year) === new Date().getFullYear())
+          .reduce((total, entry) => total + Number(entry.annualLimit), 0);
+      const allocatedElsewhere = Math.max(0, allocated - Number(quota?.annualLimit || 0));
+      if (allocatedElsewhere + officeAnnualLimit > annualBudget) {
+        return window.IMS.showToast(
+          `Office allocations would total ${allocatedElsewhere + officeAnnualLimit}, above the campus budget of ${annualBudget}.`
+        );
+      }
+      const submitButton = quotaForm.querySelector('button[type="submit"]');
+      submitButton.disabled = true;
+      const saved = await window.IMS.setOfficeItemQuota({
+        officeId,
+        itemId,
+        year: new Date().getFullYear(),
+        annualBudget,
+        officeAnnualLimit
+      });
+      submitButton.disabled = false;
+      if (!saved) return;
+      closeOfficeQuota();
+      window.IMS.showToast("Office item allocation saved.");
+    });
+    window.addEventListener("ims:records-updated", () => {
+      renderOffices();
+      updateQuotaFormSummary();
     });
 
     activityModal.querySelector("[data-close-office-activity]").addEventListener("click", closeOfficeActivity);

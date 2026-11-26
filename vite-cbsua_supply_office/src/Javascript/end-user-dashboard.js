@@ -1,5 +1,6 @@
 window.IMS.pageFeatures.push(() => {
   const availableItemList = document.getElementById('availableItemList');
+  const officeItemAllocationList = document.getElementById('officeItemAllocationList');
   const requestList = document.getElementById('myRequestList');
   const itemSelect = document.getElementById('requestItem');
   const quantityInput = document.getElementById('requestQuantity');
@@ -226,9 +227,17 @@ window.IMS.pageFeatures.push(() => {
       quantityInput.removeAttribute('max');
       return;
     }
-    const availableQuantity = Number(selectedItem.quantity);
+    const editingRequest = window.IMS.getLocalRecords('requests')
+      .find(request => request.id === requestForm?.dataset.editingRequest);
+    const requestAllocation = window.IMS.getQuarterlyRequestLimitRemaining(
+      selectedItem.id,
+      window.IMS.currentUser?.office,
+      editingRequest?.id || '',
+      editingRequest?.createdAt || new Date()
+    );
+    const availableQuantity = Math.min(Number(selectedItem.quantity), requestAllocation);
     quantityInput.max = String(availableQuantity);
-    if (Number(quantityInput.value) > availableQuantity) {
+    if (availableQuantity > 0 && Number(quantityInput.value) > availableQuantity) {
       quantityInput.value = String(availableQuantity);
     }
   }
@@ -240,8 +249,15 @@ window.IMS.pageFeatures.push(() => {
     const editingRequest = window.IMS.getLocalRecords('requests')
       .find(request => request.id === requestForm?.dataset.editingRequest);
     const availableItems = items.filter(item => Number(item.quantity) > 0 || item.id === editingRequest?.itemId);
-    const selectableItems = availableItems.filter(item => !selectedClassification
+    const matchingItems = availableItems.filter(item => !selectedClassification
       || String(item.supplyClassification || '').trim().toLowerCase() === selectedClassification.itemClassification);
+    const selectableItems = matchingItems.filter(item =>
+      Number(window.IMS.getQuarterlyRequestLimitRemaining(
+        item.id,
+        window.IMS.currentUser?.office,
+        editingRequest?.id || '',
+        editingRequest?.createdAt || new Date()
+      )) > 0);
     itemSelect.replaceChildren();
     selectableItems.forEach(item => {
       const option = document.createElement('option');
@@ -257,8 +273,8 @@ window.IMS.pageFeatures.push(() => {
       const option = document.createElement('option');
       option.value = '';
       option.textContent = selectedClassification
-        ? `No ${selectedClassification.label} items currently available`
-        : 'No items currently available';
+        ? `No ${selectedClassification.label} items have an available office allocation`
+        : 'No items have an available office allocation';
       itemSelect.append(option);
     }
     itemSelect.disabled = selectableItems.length === 0;
@@ -293,7 +309,10 @@ window.IMS.pageFeatures.push(() => {
 
         const detail = document.createElement('p');
         detail.className = 'text-sm text-cbsua-muted';
-        detail.textContent = `${item.category || 'General supplies'} · ${item.quantity} ${item.unit} available`;
+        const remaining = window.IMS.getQuarterlyRequestLimitRemaining(
+          item.id, window.IMS.currentUser?.office
+        );
+        detail.textContent = `${item.category || 'General supplies'} · ${item.quantity} ${item.unit} available · ${remaining} ${item.unit} requestable this quarter`;
 
         const actionRow = document.createElement('div');
         actionRow.className = 'mt-auto flex items-center justify-between gap-3';
@@ -309,6 +328,11 @@ window.IMS.pageFeatures.push(() => {
         requestButton.dataset.requestItem = item.id;
         requestButton.className = 'rounded-lg bg-cbsua-primary px-3 py-2 text-sm font-medium text-white hover:bg-green-700';
         requestButton.textContent = 'Request item';
+        requestButton.disabled = remaining <= 0;
+        if (requestButton.disabled) {
+          requestButton.classList.add('cursor-not-allowed', 'opacity-50');
+          requestButton.title = 'No request allocation remains for this item this quarter.';
+        }
 
         actionRow.append(stockState, requestButton);
         card.append(heading, detail, actionRow);
@@ -319,6 +343,53 @@ window.IMS.pageFeatures.push(() => {
     renderRequestItemOptions(items);
   }
 
+  function renderOfficeItemAllocations(user) {
+    if (!officeItemAllocationList) return;
+    const currentYear = new Date().getFullYear();
+    const quotas = window.IMS.getLocalRecords('officeQuotas')
+      .filter(quota => String(quota.office || '').trim().toLowerCase()
+        === String(user.office || '').trim().toLowerCase()
+        && Number(quota.year) === currentYear);
+    officeItemAllocationList.replaceChildren();
+    if (!quotas.length) {
+      const emptyState = document.createElement('p');
+      emptyState.className = 'col-span-full rounded-lg border border-dashed border-cbsua-border p-6 text-center text-sm text-cbsua-muted';
+      emptyState.textContent = 'No item allocations are assigned to your office for this year. Contact the Supply Office administrator.';
+      officeItemAllocationList.append(emptyState);
+      return;
+    }
+
+    const currentQuarter = Math.floor(new Date().getMonth() / 3);
+    quotas.forEach(quota => {
+      const card = document.createElement('article');
+      card.className = 'rounded-lg border border-cbsua-border p-4';
+      const heading = document.createElement('div');
+      heading.className = 'flex items-start justify-between gap-3';
+      const itemName = document.createElement('h4');
+      itemName.className = 'font-semibold';
+      itemName.textContent = quota.itemName;
+      const allocationYear = document.createElement('span');
+      allocationYear.className = 'shrink-0 text-xs text-cbsua-muted';
+      allocationYear.textContent = String(quota.year);
+      heading.append(itemName, allocationYear);
+
+      const annualUsage = document.createElement('p');
+      annualUsage.className = 'mt-2 text-sm text-cbsua-muted';
+      annualUsage.textContent = `Annual allocation: ${quota.annualUsed} / ${quota.annualLimit} ${quota.unit} · ${Math.max(0, quota.annualLimit - quota.annualUsed)} remaining`;
+
+      const quarters = document.createElement('div');
+      quarters.className = 'mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4';
+      quota.quarterLimits.forEach((limit, index) => {
+        const quarter = document.createElement('div');
+        quarter.className = `rounded-md px-2 py-2 text-center text-xs ${index === currentQuarter ? 'bg-cbsua-pale font-semibold text-cbsua-primary' : 'bg-gray-50 text-cbsua-muted'}`;
+        quarter.textContent = `Q${index + 1}: ${quota.quarterUsage[index]} / ${limit} ${quota.unit}`;
+        quarters.append(quarter);
+      });
+      card.append(heading, annualUsage, quarters);
+      officeItemAllocationList.append(card);
+    });
+  }
+
   function render() {
     const user = window.IMS.currentUser;
     if (!user) return;
@@ -327,6 +398,7 @@ window.IMS.pageFeatures.push(() => {
     document.getElementById('userName').textContent = user.name || user.username;
     document.getElementById('userOffice').textContent = officeName;
     document.getElementById('officeGreeting').textContent = `${officeName} · ${user.employeeId || 'Employee ID not set'}`;
+    renderOfficeItemAllocations(user);
 
     const officeKey = officeName.trim().toLowerCase();
     const employeeId = (user.employeeId || '').trim().toUpperCase();

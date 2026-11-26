@@ -152,6 +152,31 @@ CREATE TABLE IF NOT EXISTS stock_requests (
   CONSTRAINT fk_requests_reviewer FOREIGN KEY (reviewed_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS item_annual_request_budgets (
+  item_id BIGINT UNSIGNED NOT NULL,
+  allocation_year SMALLINT UNSIGNED NOT NULL,
+  annual_limit INT UNSIGNED NOT NULL,
+  updated_by BIGINT UNSIGNED DEFAULT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (item_id, allocation_year),
+  CONSTRAINT fk_item_request_budget_item FOREIGN KEY (item_id) REFERENCES inventory_items (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_item_request_budget_user FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS office_item_request_quotas (
+  office_id BIGINT UNSIGNED NOT NULL,
+  item_id BIGINT UNSIGNED NOT NULL,
+  allocation_year SMALLINT UNSIGNED NOT NULL,
+  annual_limit INT UNSIGNED NOT NULL,
+  updated_by BIGINT UNSIGNED DEFAULT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (office_id, item_id, allocation_year),
+  KEY idx_office_item_request_quota_year (item_id, allocation_year),
+  CONSTRAINT fk_office_item_request_quota_office FOREIGN KEY (office_id) REFERENCES offices (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_office_item_request_quota_item FOREIGN KEY (item_id) REFERENCES inventory_items (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_office_item_request_quota_user FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS stock_receipts (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   receipt_code VARCHAR(40) NOT NULL,

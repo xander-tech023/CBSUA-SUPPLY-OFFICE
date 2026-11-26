@@ -29,7 +29,7 @@ window.tailwind.config = {
   } }
 };
 document.addEventListener('DOMContentLoaded', async () => {
-  if (currentPage === 'index.html' || currentPage === 'navigation.html' || currentPage === 'offices.html'
+  if (currentPage === 'index.html' || currentPage === 'navigation.html'
     || currentPage === 'asset_scanner.html') return;
 
   let currentUser;
@@ -74,8 +74,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     getLocalRecords, saveRecord, updateRequestStatus, updateInventoryItem, updateSupplier, addInventoryRow,
     addRequestRow, addSupplierCard, nextRecordId, nextRequestId
   } = window.IMS;
-  const quarterlyRequestLimit = 40;
-  function getQuarterKey(value) {
+  function getRequestPeriod(value) {
     let date;
     const dateMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
     if (dateMatch) {
@@ -83,8 +82,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       date = new Date(value);
     }
-    if (Number.isNaN(date.getTime())) return '';
-    return `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`;
+    if (Number.isNaN(date.getTime())) return null;
+    return {
+      year: date.getFullYear(),
+      quarter: Math.floor(date.getMonth() / 3) + 1
+    };
   }
   function getRequestQuantity(quantity) {
     const match = /^\s*(\d+)(?:\s|$)/.exec(String(quantity || ''));
@@ -92,32 +94,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     const value = Number(match[1]);
     return Number.isSafeInteger(value) ? value : 0;
   }
-  function getQuarterlyRequestUsage(item, officeName, referenceDate = new Date(), excludedRequestId = '') {
-    if (!item || !officeName) return 0;
-    const quarter = getQuarterKey(referenceDate);
-    const normalizedOffice = String(officeName).trim().toLowerCase();
-    const normalizedItemName = String(item.name || '').trim().toLowerCase();
-    return getLocalRecords('requests').reduce((total, request) => {
-      if (excludedRequestId && String(request.id) === String(excludedRequestId)) return total;
-      const status = String(request.status || 'Pending').trim().toLowerCase();
-      if (['rejected', 'cancelled', 'canceled'].includes(status)) return total;
-      if (String(request.office || '').trim().toLowerCase() !== normalizedOffice) return total;
-      const matchesItem = request.itemId
-        ? String(request.itemId) === String(item.id)
-        : String(request.item || request.itemName || '').trim().toLowerCase() === normalizedItemName
-          || String(request.item || request.itemName || '').toLowerCase().includes(`(${String(item.id).toLowerCase()})`);
-      if (!matchesItem || getQuarterKey(request.date || request.createdAt) !== quarter) return total;
-      return total + getRequestQuantity(request.quantity);
-    }, 0);
-  }
   function getQuarterlyRequestLimitRemaining(
     itemId, officeName, excludedRequestId = '', referenceDate = new Date()
   ) {
-    const item = getLocalRecords('items').find(entry => String(entry.id) === String(itemId));
-    if (!item) return 0;
-    return Math.max(0, quarterlyRequestLimit - getQuarterlyRequestUsage(
-      item, officeName, referenceDate, excludedRequestId
-    ));
+    const period = getRequestPeriod(referenceDate);
+    if (!period || !officeName) return 0;
+    const quota = getLocalRecords('officeQuotas').find(entry =>
+      String(entry.itemId) === String(itemId)
+      && String(entry.office || '').trim().toLowerCase() === String(officeName).trim().toLowerCase()
+      && Number(entry.year) === period.year);
+    if (!quota) return 0;
+    const quarterIndex = period.quarter - 1;
+    let quarterUsed = Number(quota.quarterUsage[quarterIndex]) || 0;
+    let annualUsed = Number(quota.annualUsed) || 0;
+    if (excludedRequestId) {
+      const request = getLocalRecords('requests').find(entry => String(entry.id) === String(excludedRequestId));
+      const requestPeriod = getRequestPeriod(request?.createdAt || request?.date);
+      if (request && String(request.itemId) === String(itemId)
+        && String(request.office || '').trim().toLowerCase() === String(officeName).trim().toLowerCase()
+        && requestPeriod?.year === period.year) {
+        const excludedQuantity = getRequestQuantity(request.quantity);
+        annualUsed = Math.max(0, annualUsed - excludedQuantity);
+        if (requestPeriod.quarter === period.quarter) {
+          quarterUsed = Math.max(0, quarterUsed - excludedQuantity);
+        }
+      }
+    }
+    const quarterRemaining = Number(quota.quarterLimits[quarterIndex]) - quarterUsed;
+    const annualRemaining = Number(quota.annualLimit) - annualUsed;
+    return Math.max(0, Math.min(quarterRemaining, annualRemaining));
   }
   function updateRequestLimitHint() {
     const requestForm = document.querySelector('#requestForm');
@@ -127,15 +132,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     const item = getLocalRecords('items').find(entry => String(entry.id) === String(itemId));
     const officeName = requestForm.querySelector('#requestOffice')?.value;
     if (!item || !officeName) {
-      limitHint.textContent = `Quarterly limit: ${quarterlyRequestLimit} units per item for each office.`;
+      limitHint.textContent = 'Quarterly request limits are assigned by the administrator for each office and item.';
       return;
     }
     const editingRequest = getLocalRecords('requests')
       .find(request => request.id === requestForm.dataset.editingRequest);
+    const period = getRequestPeriod(editingRequest?.createdAt || new Date());
+    const quota = getLocalRecords('officeQuotas').find(entry =>
+      String(entry.itemId) === String(item.id)
+      && String(entry.office || '').trim().toLowerCase() === officeName.trim().toLowerCase()
+      && Number(entry.year) === period?.year);
+    if (!quota) {
+      limitHint.textContent = `No ${period?.year || ''} request allocation has been assigned to ${officeName} for ${item.name}.`;
+      return;
+    }
     const remaining = getQuarterlyRequestLimitRemaining(
-      item.id, officeName, editingRequest?.id || '', editingRequest?.date || new Date()
+      item.id, officeName, editingRequest?.id || '', editingRequest?.createdAt || new Date()
     );
-    limitHint.textContent = `Quarterly limit: ${quarterlyRequestLimit} ${item.unit} per office for this item · ${remaining} ${item.unit} remaining this quarter. Pending, approved, and issued requests count.`;
+    const quarter = period?.quarter || 1;
+    const quarterLimit = Number(quota.quarterLimits[quarter - 1]) || 0;
+    const quarterUsed = Number(quota.quarterUsage[quarter - 1]) || 0;
+    limitHint.textContent = `Q${quarter}: ${quarterUsed}/${quarterLimit} ${item.unit} used · ${remaining} ${item.unit} remain this quarter. Annual allocation: ${quota.annualUsed}/${quota.annualLimit} ${item.unit}. Pending, approved, and issued requests count.`;
   }
   const modalId = {
     'inventory.html': 'addItemModal',
@@ -888,7 +905,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function setupForms() {
     document.addEventListener('submit', async event => {
       const form = event.target;
-      if (form.id === 'loginForm') return;
+      if (form.id === 'loginForm' || form.id === 'officeQuotaForm') return;
       event.preventDefault();
       event.stopImmediatePropagation();
       if (form.id === 'addItemForm') {
@@ -1025,11 +1042,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           return showToast(`Only ${item.quantity} ${item.unit} are currently available.`);
         }
         const remainingQuarterlyQuantity = getQuarterlyRequestLimitRemaining(
-          itemId, request.office, requestBeingEdited?.id || '', requestBeingEdited?.date || new Date()
+          itemId, request.office, requestBeingEdited?.id || '', requestBeingEdited?.createdAt || new Date()
         );
         if (quantity > remainingQuarterlyQuantity) {
           return showToast(
-            `Quarterly limit exceeded. This office may request up to ${quarterlyRequestLimit} ${item.unit} of this item per quarter; ${remainingQuarterlyQuantity} ${item.unit} remain.`
+            `Request limit exceeded. Only ${remainingQuarterlyQuantity} ${item.unit} remain in this office's assigned allocation.`
           );
         }
         if (!requestBeingEdited && getLocalRecords('requests').some(savedRequest => savedRequest.id === request.id)) {
@@ -1145,7 +1162,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     createIcon,
     showToast,
     getQuarterlyRequestLimitRemaining,
-    quarterlyRequestLimit
   });
   applyTailwindUtilities();
   buildSidebar();
