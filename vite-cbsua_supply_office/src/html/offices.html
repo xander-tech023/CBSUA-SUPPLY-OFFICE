@@ -365,7 +365,7 @@
         const initials = name.split(/[\s/]+/).filter(Boolean).slice(0, 2).map(word => word[0]).join("").replace(/[^A-Z]/gi, "").toUpperCase();
         const label = type.charAt(0).toUpperCase() + type.slice(1);
         const allocationAction = window.IMS?.currentUser?.role === "admin"
-          ? `<button type="button" class="office-quota-manage text-cbsua-primary font-medium hover:underline" data-office="${name}" data-office-id="${officeId}">Manage item allocations</button>`
+          ? `<button type="button" class="office-quota-manage text-cbsua-primary font-medium hover:underline" data-office="${name}" data-office-id="${officeId}">Set item request limits</button>`
           : "";
         return `
           <article class="stat-card hover:border-cbsua-primary/40 transition-colors" data-office-code="${officeId}">
@@ -383,7 +383,6 @@
             <div data-office-quota-summary class="mt-4 space-y-2 border-t border-cbsua-border pt-3"></div>
             <div class="mt-4 pt-3 border-t border-cbsua-border flex items-center justify-between gap-3 text-sm">
               <button type="button" class="office-details text-cbsua-primary font-medium hover:underline" data-office="${name}">Recent activity →</button>
-              <button type="button" class="office-request text-cbsua-primary font-medium hover:underline" data-office="${name}">Request supply →</button>
             </div>
             ${allocationAction ? `<div class="mt-3 text-right text-sm">${allocationAction}</div>` : ""}
           </article>`;
@@ -492,11 +491,6 @@
       const quotaButton = event.target.closest(".office-quota-manage");
       if (quotaButton) {
         openOfficeQuota(quotaButton.dataset.office, quotaButton.dataset.officeId);
-        return;
-      }
-      const button = event.target.closest(".office-request");
-      if (button) {
-        window.location.href = `stock_request.html?newRequest=1&office=${encodeURIComponent(button.dataset.office)}`;
         return;
       }
       const detailsButton = event.target.closest(".office-details");
