@@ -8,7 +8,7 @@ Set the connection and initial account passwords in PowerShell before starting t
 
 ```powershell
 $env:DB_HOST = "127.0.0.1"
-$env:DB_PORT = "5432"
+$env:DB_PORT = "5000"
 $env:DB_NAME = "cbsua_supply_office"
 $env:DB_USER = "postgres"
 $env:DB_PASSWORD = "REPLACE_WITH_YOUR_POSTGRES_PASSWORD"
@@ -17,6 +17,7 @@ $env:STAFF_PASSWORD = "REPLACE_WITH_ANOTHER_UNIQUE_PASSWORD_2"
 npm run api
 ```
 
+This PostgreSQL installation listens on port `5000`; use `5432` or another port if that is what your PostgreSQL server is configured to use.
 Replace the example passwords with strong, unique values. Use the configured PostgreSQL role and strong, unique passwords for deployments. Do not commit credentials. If an admin or staff row already exists without a password hash, the API sets its password from the corresponding environment variable on first startup; an existing hashed password is left unchanged. If a role has no account, the API creates one using `ADMIN_USERNAME` or `STAFF_USERNAME` (defaulting to `admin` and `staff`). For an existing account, sign in with its current username in the `users` table. Initial passwords must be 12-64 characters and contain a letter and a number.
 
 Application source code is written in TypeScript. `npm run build` type-checks the root TypeScript and API sources, then builds the Vite frontend; browser JavaScript is generated in the ignored `vite-cbsua_supply_office/dist` directory.

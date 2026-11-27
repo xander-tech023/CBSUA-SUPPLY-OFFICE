@@ -150,6 +150,31 @@ async function initializeSchema(pool) {
   for (const statement of splitSqlStatements(schema)) {
     await pool.query(statement);
   }
+
+  const booleanColumns = [
+    ['offices', 'is_active'],
+    ['users', 'must_change_password'],
+    ['users', 'is_active'],
+    ['item_categories', 'is_active'],
+    ['suppliers', 'is_active'],
+    ['inventory_items', 'is_active']
+  ];
+  for (const [table, column] of booleanColumns) {
+    const result = await pool.query(
+      `SELECT data_type FROM information_schema.columns
+       WHERE table_schema = current_schema() AND table_name = $1 AND column_name = $2`,
+      [table, column]
+    );
+    if (result.rows[0]?.data_type !== 'boolean') continue;
+
+    await pool.query(`ALTER TABLE "${table}" ALTER COLUMN "${column}" DROP DEFAULT`);
+    await pool.query(
+      `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE SMALLINT
+       USING CASE WHEN "${column}" THEN 1 ELSE 0 END`
+    );
+    await pool.query(`ALTER TABLE "${table}" ALTER COLUMN "${column}" SET DEFAULT 1`);
+  }
+
   for (const [index, name] of officeNames.entries()) {
     await pool.execute(
       'INSERT INTO offices (office_code, name, is_active) VALUES (?, ?, 1) ON CONFLICT (office_code) DO NOTHING',
