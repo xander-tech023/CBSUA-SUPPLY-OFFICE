@@ -1,3 +1,4 @@
+"use strict";
 (() => {
     const ims = window.IMS;
     ims.pageFeatures.push(() => {

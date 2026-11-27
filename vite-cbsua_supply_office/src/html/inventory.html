@@ -14,6 +14,7 @@
   <script type="module" src="../Javascript/form-validation.js"></script>
   <script type="module" src="../Javascript/inventory.js"></script>
   <script type="module" src="../Javascript/scanner-link.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 </head>
 <body class="font-sans bg-gray-50 min-h-screen">
@@ -72,11 +73,26 @@
           <p class="text-cbsua-muted text-sm">One dependable record of campus supplies, stock levels, and storage details.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
-          <div class="flex flex-col items-end gap-1">
-            <button type="button" data-share-asset-scanner class="px-4 py-2 border border-cbsua-border rounded-lg text-sm font-medium hover:bg-gray-50">
-              Share mobile scanner
+          <div class="relative">
+            <button type="button" data-share-asset-scanner aria-expanded="false" aria-controls="assetScannerSharePanel" class="px-4 py-2 border border-cbsua-border rounded-lg text-sm font-medium hover:bg-gray-50">
+              Share asset QR
             </button>
-            <a data-asset-scanner-link hidden target="_blank" rel="noopener noreferrer" class="max-w-64 break-all text-right text-xs text-cbsua-primary underline"></a>
+            <section id="assetScannerSharePanel" data-asset-scanner-share-panel hidden class="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-cbsua-border bg-white p-4 text-left shadow-xl">
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="font-semibold">Share memorandum receipt QR</h3>
+                <button type="button" data-close-asset-scanner-share aria-label="Close sharing options" class="rounded px-2 py-1 text-cbsua-muted hover:bg-gray-100">×</button>
+              </div>
+                <label class="mt-3 block text-xs font-medium" for="shareAssetQrSelect">Issued memorandum receipt</label>
+                <select id="shareAssetQrSelect" data-share-asset-qr-select class="mt-1 w-full rounded-lg border border-cbsua-border px-2 py-2 text-xs"></select>
+                <p data-asset-qr-status class="mt-2 text-xs text-cbsua-muted" role="status" aria-live="polite">Choose an issued ICS or PAR record.</p>
+                <div data-asset-scanner-qr class="mx-auto my-3 flex min-h-40 w-40 items-center justify-center rounded-lg border border-cbsua-border bg-white p-2" aria-label="Memorandum receipt QR code"></div>
+                <a data-asset-scanner-link hidden target="_blank" rel="noopener noreferrer" class="mb-3 block break-all text-xs text-cbsua-primary underline">Open memorandum receipt details</a>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" data-copy-asset-scanner-link disabled class="rounded-lg border border-cbsua-border px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">Copy link</button>
+                <a data-share-asset-scanner-whatsapp hidden target="_blank" rel="noopener noreferrer" class="rounded-lg border border-cbsua-border px-3 py-2 text-center text-sm font-medium hover:bg-gray-50">WhatsApp</a>
+                <a data-share-asset-scanner-email hidden class="col-span-2 rounded-lg border border-cbsua-border px-3 py-2 text-center text-sm font-medium hover:bg-gray-50">Email</a>
+              </div>
+            </section>
           </div>
           <button type="button" data-open-category-modal class="px-4 py-2 border border-cbsua-border rounded-lg text-sm font-medium hover:bg-gray-50">
             + Add categories

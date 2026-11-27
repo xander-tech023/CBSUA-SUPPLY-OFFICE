@@ -1,3 +1,4 @@
+"use strict";
 (() => {
     const browser = window;
     const ims = browser.IMS;

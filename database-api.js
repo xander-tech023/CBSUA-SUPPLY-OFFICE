@@ -797,38 +797,12 @@ async function updateSupplier(connection, supplierCode, changes) {
 async function setRequestStatus(connection, requestId, status, user) {
   if (user.role !== 'admin') throw new ApiError(403, 'Only the Supply Office head can review requests.');
   if (!['Approved', 'Rejected'].includes(status)) throw new ApiError(400, 'Choose a valid request status.');
-  const [requests] = await connection.execute(
-    'SELECT id, status, item_id, quantity FROM stock_requests WHERE request_code = ? FOR UPDATE',
-    [requestId]
-  );
-  const request = requests[0];
-  if (!request || request.status !== 'Pending') throw new ApiError(409, 'This request is no longer awaiting review.');
-  if (status === 'Approved') {
-    const [items] = await connection.execute(
-      'SELECT quantity_on_hand FROM inventory_items WHERE id = ? FOR UPDATE',
-      [request.item_id]
-    );
-    const [reservedRows] = await connection.execute(
-      `SELECT COALESCE(SUM(r.quantity - COALESCE(i.issued, 0)), 0) AS reserved
-         FROM stock_requests r
-         LEFT JOIN (SELECT request_id, SUM(quantity) AS issued FROM stock_issuances GROUP BY request_id) i
-           ON i.request_id = r.id
-        WHERE r.item_id = ? AND r.status = 'Approved'`,
-      [request.item_id]
-    );
-    const available = Number(items[0]?.quantity_on_hand || 0) - Number(reservedRows[0].reserved || 0);
-    if (Number(request.quantity) > available) {
-      throw new ApiError(409, 'There is not enough unreserved stock to approve this request.');
-    }
+  try {
+    await connection.execute('CALL review_stock_request(?, ?, ?)', [requestId, status, user.id]);
+  } catch (error) {
+    if (error.sqlState === '45000') throw new ApiError(409, error.message);
+    throw error;
   }
-  await connection.execute(
-    'UPDATE stock_requests SET status = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?',
-    [status, user.id, request.id]
-  );
-  await connection.execute(
-    'INSERT INTO request_status_history (request_id, old_status, new_status, changed_by) VALUES (?, ?, ?, ?)',
-    [request.id, request.status, status, user.id]
-  );
 }
 
 async function cancelRequest(connection, requestId, user) {

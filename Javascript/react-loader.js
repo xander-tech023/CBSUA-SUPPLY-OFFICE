@@ -1,3 +1,4 @@
+"use strict";
 (() => {
     const react = document.createElement('script');
     react.src = 'https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js';

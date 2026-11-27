@@ -1,3 +1,4 @@
+"use strict";
 (() => {
     const typedWindow = window;
     typedWindow.IMS = typedWindow.IMS || {};

@@ -271,6 +271,10 @@ async function initializeDatabase() {
 
   try {
     await initializeSchema(pool);
+    const routines = fs.readFileSync(path.join(__dirname, 'database', 'routines.sql'), 'utf8');
+    for (const statement of routines.split(/\n\s*\$\$\s*\n?/).map(value => value.trim()).filter(Boolean)) {
+      await pool.query(statement);
+    }
     await pool.query(`CREATE TABLE IF NOT EXISTS record_sequences (
       sequence_key VARCHAR(80) NOT NULL,
       next_value BIGINT UNSIGNED NOT NULL DEFAULT 0,

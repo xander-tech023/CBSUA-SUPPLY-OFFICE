@@ -2,6 +2,7 @@ import inventoryCustodianSlipUrl from '../Forms/ICS.pdf?url'
 import propertyAcknowledgmentReceiptUrl from '../Forms/PAR.pdf?url'
 import requisitionAndIssueSlipUrl from '../Forms/Requisition_and_Issue_Slip.pdf?url'
 import logoUrl from '../Image/logo.png'
+import { getIssuedAssetQrRecords } from './asset-qr-data.js'
 
 window.IMS.pageFeatures.push(() => {
   const { getLocalRecords, getRemainingRequestQuantity, showToast } = window.IMS;
@@ -169,51 +170,9 @@ window.IMS.pageFeatures.push(() => {
     updatePreview(true);
   }
 
-  function getIssuedAssetQrRecords() {
-    const requests = new Map(getLocalRecords('requests').map(request => [request.id, request]));
-    const items = new Map(getLocalRecords('items').map(item => [item.id, item]));
-    return getLocalRecords('issuances').map(issuance => {
-      const request = requests.get(issuance.requestId);
-      const item = items.get(issuance.itemId);
-      const documentType = String(request?.documentType || '').toUpperCase();
-      if (!request || !item || !['ICS', 'PAR'].includes(documentType)) return null;
-      const classification = String(request.supplyClassification || '').trim().toLowerCase().replace(/\s+/g, '-');
-      if ((documentType === 'ICS' && classification !== 'semi-expendable')
-        || (documentType === 'PAR' && classification !== 'fixed-asset')) return null;
-
-      const details = request.classificationDetails || {};
-      const specifications = [...new Set([details.specifications, item.description]
-        .map(value => String(value || '').trim()).filter(Boolean))].join('\n');
-      return {
-        documentType,
-        classification: request.supplyClassification || (documentType === 'ICS' ? 'Semi-Expendable' : 'Fixed Asset'),
-        itemCode: item.id,
-        itemName: item.name,
-        description: item.description || '',
-        specifications,
-        quantity: issuance.quantity,
-        unit: item.unit || '',
-        propertyNumber: details.propertyNumber || item.propertyNumber || '',
-        estimatedUsefulLifeYears: details.estimatedUsefulLifeYears || details.usefulLifeYears || '',
-        dateAcquired: details.dateAcquired || item.dateAcquired || '',
-        amount: details.amount ?? '',
-        unitCost: details.unitCost ?? details.estimatedUnitCost ?? '',
-        supplier: details.supplier || item.supplier || '',
-        deliveryReceiptDate: details.deliveryReceiptDate || '',
-        purchaseOrderNumber: details.purchaseOrderNumber || '',
-        purchaseOrderDate: details.purchaseOrderDate || '',
-        iarNumber: details.iarNumber || '',
-        iarDate: details.iarDate || '',
-        fundCluster: details.fundCluster || '',
-        issuedOn: issuance.date || request.date || '',
-        issuanceReference: issuance.id
-      };
-    }).filter(Boolean);
-  }
-
   function refreshAssetQrOptions(preferLatest = false) {
     if (!assetQrSelect || !assetQrButton) return;
-    const records = getIssuedAssetQrRecords();
+    const records = getIssuedAssetQrRecords(getLocalRecords);
     const previousValue = assetQrSelect.value;
     assetQrSelect.replaceChildren();
     records.forEach(asset => {
@@ -234,7 +193,7 @@ window.IMS.pageFeatures.push(() => {
   }
 
   async function exportAssetQrCodes() {
-    const records = getIssuedAssetQrRecords();
+    const records = getIssuedAssetQrRecords(getLocalRecords);
     const asset = records.find(record => record.issuanceReference === assetQrSelect?.value);
     if (!asset) {
       showToast('Select an issued Semi-expendable or Fixed Asset item to export its QR code.');

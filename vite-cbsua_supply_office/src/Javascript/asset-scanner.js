@@ -25,11 +25,14 @@ function decodeAssetPayload(encoded) {
 function renderAsset(asset) {
   const fields = [
     ['Classification', asset.classification],
+    ['Memorandum receipt holder', asset.holderName],
+    ['Holder employee ID', asset.holderEmployeeId],
+    ['Office', asset.office],
     ['Description', asset.description],
     ['Specifications', asset.specifications],
     ['Quantity', [asset.quantity, asset.unit].filter(Boolean).join(' ')],
     ['Property number', asset.propertyNumber],
-    ['Estimated useful life', asset.estimatedUsefulLifeYears && `${asset.estimatedUsefulLifeYears} years`],
+    ['Estimated useful life (years)', asset.estimatedUsefulLifeYears && `${asset.estimatedUsefulLifeYears} years`],
     ['Date acquired', asset.dateAcquired],
     ['Amount', asset.amount],
     ['Unit cost', asset.unitCost],

@@ -1,3 +1,4 @@
+"use strict";
 window.IMS = window.IMS || {};
 window.IMS.pageFeatures = window.IMS.pageFeatures || [];
 (() => {

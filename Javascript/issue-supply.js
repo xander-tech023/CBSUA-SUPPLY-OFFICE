@@ -1,3 +1,4 @@
+"use strict";
 (() => {
     const browser = window;
     browser.IMS.pageFeatures.push(() => {

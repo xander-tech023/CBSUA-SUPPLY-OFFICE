@@ -1,3 +1,4 @@
+"use strict";
 document.addEventListener('DOMContentLoaded', () => {
     const today = new Date();
     today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
