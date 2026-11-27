@@ -6,13 +6,15 @@ final class Setup
     public static function connect(): PDO
     {
         $host = getenv('DB_HOST') ?: '127.0.0.1';
+        $port = getenv('DB_PORT') ?: '5432';
         $database = getenv('DB_NAME') ?: 'cbsua_supply_office';
-        $username = getenv('DB_USER') ?: 'root';
+        $username = getenv('DB_USER') ?: 'postgres';
         $password = getenv('DB_PASSWORD') ?: '';
 
         $dsn = sprintf(
-            'mysql:host=%s;dbname=%s;charset=utf8mb4',
+            'pgsql:host=%s;port=%s;dbname=%s',
             $host,
+            $port,
             $database
         );
 

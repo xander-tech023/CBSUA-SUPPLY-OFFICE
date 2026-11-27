@@ -7,11 +7,11 @@
     "alwaysStrict": false,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "noEmit": false,
-    "rootDir": "./Javascript",
-    "outDir": "./Javascript",
+    "noEmit": true,
+    "rootDir": "./TypeScript",
+    "outDir": "./TypeScript",
     "types": []
   },
-  "include": ["Javascript/**/*.ts"],
+  "include": ["TypeScript/**/*.ts"],
   "exclude": ["node_modules", "vite-cbsua_supply_office"]
 }

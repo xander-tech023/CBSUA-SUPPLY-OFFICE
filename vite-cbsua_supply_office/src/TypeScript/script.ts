@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('The workspace could not be initialized.', error);
     const message = document.createElement('p');
     message.className = 'mx-auto mt-12 max-w-xl rounded-lg bg-red-50 p-5 text-red-800';
-    message.textContent = 'Could not connect to the database-backed workspace. Check that MySQL and the API are running, then reload this page.';
+    message.textContent = 'Could not connect to the database-backed workspace. Check that PostgreSQL and the API are running, then reload this page.';
     document.body.replaceChildren(message);
     return;
   }

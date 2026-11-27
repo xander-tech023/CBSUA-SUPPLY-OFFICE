@@ -1,4 +1,4 @@
-import { apiRequest, jsonRequest } from './api-client.js';
+import { apiRequest, jsonRequest } from './api-client.ts';
 
 window.IMS = window.IMS || {};
 

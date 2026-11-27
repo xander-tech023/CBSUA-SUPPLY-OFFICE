@@ -5,6 +5,8 @@ const SESSION_COOKIE = 'cbsua_supply_session';
 const SEQUENCES_TABLE = 'record_sequences';
 
 class ApiError extends Error {
+  status;
+
   constructor(status, message) {
     super(message);
     this.status = status;
@@ -18,10 +20,10 @@ function route(handler) {
 function createErrorHandler() {
   return (error, request, response, next) => {
     if (response.headersSent) return next(error);
-    if (error.code === 'ER_DUP_ENTRY') {
+    if (error.code === '23505') {
       return response.status(409).json({ error: 'A record with that code or name already exists.' });
     }
-    if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.code === 'ER_BAD_NULL_ERROR') {
+    if (error.code === '23503' || error.code === '23502') {
       return response.status(400).json({ error: 'The submitted record references missing or incomplete data.' });
     }
     const status = Number(error.status) || 500;
@@ -208,7 +210,7 @@ async function withTransaction(pool, operation) {
 async function nextSequence(connection, key, minimum = 0) {
   await connection.execute(
     `INSERT INTO ${SEQUENCES_TABLE} (sequence_key, next_value) VALUES (?, 0)
-     ON DUPLICATE KEY UPDATE sequence_key = VALUES(sequence_key)`,
+     ON CONFLICT (sequence_key) DO NOTHING`,
     [key]
   );
   const [rows] = await connection.execute(
@@ -225,7 +227,7 @@ async function nextSequence(connection, key, minimum = 0) {
 
 async function nextCodeNumber(connection, key, table, column, prefix) {
   const [rows] = await connection.query(
-    `SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(${column}, '-', -1) AS UNSIGNED)), 0) AS maximum
+    `SELECT COALESCE(MAX(split_part(${column}, '-', array_length(string_to_array(${column}, '-'), 1))::BIGINT), 0) AS maximum
        FROM ${table} WHERE ${column} LIKE ?`,
     [`${prefix}%`]
   );
@@ -303,9 +305,9 @@ async function enforceOfficeItemQuota(connection, officeId, item, quantity, year
   if (excludedRequestId !== null) usageParameters.push(excludedRequestId);
   const [usageRows] = await connection.execute(
     `SELECT COALESCE(SUM(quantity), 0) AS annual_used,
-            COALESCE(SUM(CASE WHEN QUARTER(created_at) = ? THEN quantity ELSE 0 END), 0) AS quarter_used
+            COALESCE(SUM(CASE WHEN EXTRACT(QUARTER FROM created_at)::int = ? THEN quantity ELSE 0 END), 0) AS quarter_used
        FROM stock_requests
-      WHERE office_id = ? AND item_id = ? AND YEAR(created_at) = ?
+      WHERE office_id = ? AND item_id = ? AND EXTRACT(YEAR FROM created_at)::int = ?
         AND status NOT IN ('Rejected', 'Cancelled')${exclusion}`,
     usageParameters
   );
@@ -326,7 +328,7 @@ async function setOfficeItemQuota(connection, record, user) {
     throw new ApiError(403, 'Only an administrator can assign office request allocations.');
   }
   const [calendarRows] = await connection.execute(
-    'SELECT YEAR(CURRENT_DATE()) AS allocation_year'
+    'SELECT EXTRACT(YEAR FROM CURRENT_DATE)::int AS allocation_year'
   );
   const year = allocationInteger(record.year, 'Allocation year', { minimum: 2000 });
   if (year !== Number(calendarRows[0].allocation_year)) {
@@ -349,7 +351,8 @@ async function setOfficeItemQuota(connection, record, user) {
   await connection.execute(
     `INSERT INTO item_annual_request_budgets (item_id, allocation_year, annual_limit, updated_by)
      VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE annual_limit = VALUES(annual_limit), updated_by = VALUES(updated_by)`,
+     ON CONFLICT (item_id, allocation_year)
+     DO UPDATE SET annual_limit = EXCLUDED.annual_limit, updated_by = EXCLUDED.updated_by`,
     [item.id, year, annualBudget, user.id]
   );
   const [budgetRows] = await connection.execute(
@@ -378,17 +381,18 @@ async function setOfficeItemQuota(connection, record, user) {
     `INSERT INTO office_item_request_quotas
       (office_id, item_id, allocation_year, annual_limit, updated_by)
      VALUES (?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE annual_limit = VALUES(annual_limit), updated_by = VALUES(updated_by)`,
+      ON CONFLICT (office_id, item_id, allocation_year)
+      DO UPDATE SET annual_limit = EXCLUDED.annual_limit, updated_by = EXCLUDED.updated_by`,
     [office.id, item.id, year, officeAnnualLimit, user.id]
   );
   const [usageRows] = await connection.execute(
     `SELECT COALESCE(SUM(quantity), 0) AS annual_used,
-            COALESCE(SUM(CASE WHEN QUARTER(created_at) = 1 THEN quantity ELSE 0 END), 0) AS q1_used,
-            COALESCE(SUM(CASE WHEN QUARTER(created_at) = 2 THEN quantity ELSE 0 END), 0) AS q2_used,
-            COALESCE(SUM(CASE WHEN QUARTER(created_at) = 3 THEN quantity ELSE 0 END), 0) AS q3_used,
-            COALESCE(SUM(CASE WHEN QUARTER(created_at) = 4 THEN quantity ELSE 0 END), 0) AS q4_used
+            COALESCE(SUM(CASE WHEN EXTRACT(QUARTER FROM created_at)::int = 1 THEN quantity ELSE 0 END), 0) AS q1_used,
+            COALESCE(SUM(CASE WHEN EXTRACT(QUARTER FROM created_at)::int = 2 THEN quantity ELSE 0 END), 0) AS q2_used,
+            COALESCE(SUM(CASE WHEN EXTRACT(QUARTER FROM created_at)::int = 3 THEN quantity ELSE 0 END), 0) AS q3_used,
+            COALESCE(SUM(CASE WHEN EXTRACT(QUARTER FROM created_at)::int = 4 THEN quantity ELSE 0 END), 0) AS q4_used
        FROM stock_requests
-      WHERE office_id = ? AND item_id = ? AND YEAR(created_at) = ?
+      WHERE office_id = ? AND item_id = ? AND EXTRACT(YEAR FROM created_at)::int = ?
         AND status NOT IN ('Rejected', 'Cancelled')`,
     [office.id, item.id, year]
   );
@@ -496,7 +500,7 @@ async function saveRequest(connection, record, user) {
 
   const requestDate = dateOnly(record.date, 'Request date');
   const [quotaPeriodRows] = await connection.execute(
-    'SELECT YEAR(CURRENT_DATE()) AS allocation_year, QUARTER(CURRENT_DATE()) AS allocation_quarter'
+    'SELECT EXTRACT(YEAR FROM CURRENT_DATE)::int AS allocation_year, EXTRACT(QUARTER FROM CURRENT_DATE)::int AS allocation_quarter'
   );
   await enforceOfficeItemQuota(
     connection, office.id, item, quantity,
@@ -556,7 +560,7 @@ async function updatePendingRequest(connection, requestCode, record, user) {
   }
   const [requestRows] = await connection.execute(
     `SELECT id, request_date, office_id, requester_id, status,
-            YEAR(created_at) AS allocation_year, QUARTER(created_at) AS allocation_quarter
+            EXTRACT(YEAR FROM created_at)::int AS allocation_year, EXTRACT(QUARTER FROM created_at)::int AS allocation_quarter
        FROM stock_requests WHERE request_code = ? FOR UPDATE`,
     [String(requestCode || '')]
   );
@@ -859,7 +863,7 @@ function inventoryStatus(item) {
   const quantity = Number(item.quantity_on_hand);
   const minimum = Number(item.minimum_quantity);
   const expiry = item.expiry_date ? new Date(`${item.expiry_date}T00:00:00`) : null;
-  const daysUntilExpiry = expiry ? Math.ceil((expiry - new Date()) / 86400000) : Infinity;
+  const daysUntilExpiry = expiry ? Math.ceil((expiry.getTime() - Date.now()) / 86400000) : Infinity;
   if (quantity <= 0) return 'Out of stock';
   if (daysUntilExpiry <= 45) return 'Expiring soon';
   return quantity <= minimum ? 'Low stock' : 'In stock';
@@ -925,11 +929,11 @@ async function readRecords(pool, user) {
               o.office_code, o.name AS office, i.item_code, i.name AS item_name, i.unit,
               b.annual_limit AS campus_annual_budget,
               COALESCE(SUM(r.quantity), 0) AS annual_used,
-              COALESCE(SUM(CASE WHEN QUARTER(r.created_at) = 1 THEN r.quantity ELSE 0 END), 0) AS q1_used,
-              COALESCE(SUM(CASE WHEN QUARTER(r.created_at) = 2 THEN r.quantity ELSE 0 END), 0) AS q2_used,
-              COALESCE(SUM(CASE WHEN QUARTER(r.created_at) = 3 THEN r.quantity ELSE 0 END), 0) AS q3_used,
-              COALESCE(SUM(CASE WHEN QUARTER(r.created_at) = 4 THEN r.quantity ELSE 0 END), 0) AS q4_used,
-              QUARTER(CURRENT_DATE()) AS current_quarter
+              COALESCE(SUM(CASE WHEN EXTRACT(QUARTER FROM r.created_at)::int = 1 THEN r.quantity ELSE 0 END), 0) AS q1_used,
+              COALESCE(SUM(CASE WHEN EXTRACT(QUARTER FROM r.created_at)::int = 2 THEN r.quantity ELSE 0 END), 0) AS q2_used,
+              COALESCE(SUM(CASE WHEN EXTRACT(QUARTER FROM r.created_at)::int = 3 THEN r.quantity ELSE 0 END), 0) AS q3_used,
+              COALESCE(SUM(CASE WHEN EXTRACT(QUARTER FROM r.created_at)::int = 4 THEN r.quantity ELSE 0 END), 0) AS q4_used,
+              EXTRACT(QUARTER FROM CURRENT_DATE)::int AS current_quarter
          FROM office_item_request_quotas q
          JOIN offices o ON o.id = q.office_id
          JOIN inventory_items i ON i.id = q.item_id
@@ -937,9 +941,9 @@ async function readRecords(pool, user) {
            ON b.item_id = q.item_id AND b.allocation_year = q.allocation_year
          LEFT JOIN stock_requests r
            ON r.office_id = q.office_id AND r.item_id = q.item_id
-          AND YEAR(r.created_at) = q.allocation_year
+          AND EXTRACT(YEAR FROM r.created_at)::int = q.allocation_year
           AND r.status NOT IN ('Rejected', 'Cancelled')
-        WHERE ((? <> 'end-user' AND q.allocation_year = YEAR(CURRENT_DATE()))
+        WHERE ((? <> 'end-user' AND q.allocation_year = EXTRACT(YEAR FROM CURRENT_DATE)::int)
           OR (? = 'end-user' AND o.name = ?))
         GROUP BY q.office_id, q.item_id, q.allocation_year, q.annual_limit,
                  o.office_code, o.name, i.item_code, i.name, i.unit, b.annual_limit
@@ -954,7 +958,7 @@ async function readRecords(pool, user) {
          JOIN inventory_items i ON i.id = b.item_id
          LEFT JOIN office_item_request_quotas q
            ON q.item_id = b.item_id AND q.allocation_year = b.allocation_year
-        WHERE b.allocation_year = YEAR(CURRENT_DATE())
+        WHERE b.allocation_year = EXTRACT(YEAR FROM CURRENT_DATE)::int
         GROUP BY b.item_id, b.allocation_year, b.annual_limit, i.item_code, i.name, i.unit
         ORDER BY i.name`
     )
@@ -1117,7 +1121,7 @@ async function updateProfileEmployeeId(pool, user, employeeId) {
   try {
     await pool.execute('UPDATE users SET employee_id = ? WHERE id = ?', [normalized, user.id]);
   } catch (error) {
-    if (error.code === 'ER_DUP_ENTRY') throw new ApiError(409, 'That employee ID is already used by another account.');
+    if (error.code === '23505') throw new ApiError(409, 'That employee ID is already used by another account.');
     throw error;
   }
   return normalized;
@@ -1204,7 +1208,7 @@ function registerDatabaseApi(app, pool) {
     const maxAge = remember ? 30 * 24 * 60 * 60 : 12 * 60 * 60;
     await pool.execute('DELETE FROM user_sessions WHERE expires_at <= NOW()');
     await pool.execute(
-      'INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND))',
+      "INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES (?, ?, NOW() + (? * INTERVAL '1 second'))",
       [account.id, tokenHash, maxAge]
     );
     issueCookie(response, request, token, maxAge, remember);
@@ -1493,3 +1497,5 @@ function registerDatabaseApi(app, pool) {
 }
 
 module.exports = { registerDatabaseApi, createErrorHandler, ApiError };
+
+export {};

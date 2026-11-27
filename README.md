@@ -2,28 +2,30 @@
 
 ## Database setup
 
-Start MySQL from XAMPP. The API connects to MySQL and creates the `cbsua_supply_office` database and required tables if they do not already exist. Existing tables and rows are preserved; the application does not import browser-local records or accounts.
+Install and start PostgreSQL. The API connects to PostgreSQL and creates the `cbsua_supply_office` database and required tables if they do not already exist. The configured PostgreSQL role must be allowed to create databases. Existing PostgreSQL tables and rows are preserved; the previous database is not imported automatically, and browser-local records or accounts are not imported.
 
 Set the connection and initial account passwords in PowerShell before starting the API:
 
 ```powershell
 $env:DB_HOST = "127.0.0.1"
-$env:DB_PORT = "3306"
+$env:DB_PORT = "5432"
 $env:DB_NAME = "cbsua_supply_office"
-$env:DB_USER = "root"
-$env:DB_PASSWORD = ""
+$env:DB_USER = "postgres"
+$env:DB_PASSWORD = "REPLACE_WITH_YOUR_POSTGRES_PASSWORD"
 $env:ADMIN_PASSWORD = "REPLACE_WITH_A_UNIQUE_PASSWORD_1"
 $env:STAFF_PASSWORD = "REPLACE_WITH_ANOTHER_UNIQUE_PASSWORD_2"
 npm run api
 ```
 
-Replace the example passwords with strong, unique values. Use the configured MySQL account and strong, unique passwords for deployments. Do not commit credentials. If an admin or staff row already exists without a password hash, the API sets its password from the corresponding environment variable on first startup; an existing hashed password is left unchanged. If a role has no account, the API creates one using `ADMIN_USERNAME` or `STAFF_USERNAME` (defaulting to `admin` and `staff`). For an existing account, sign in with its current username in the `users` table. Initial passwords must be 12-64 characters and contain a letter and a number.
+Replace the example passwords with strong, unique values. Use the configured PostgreSQL role and strong, unique passwords for deployments. Do not commit credentials. If an admin or staff row already exists without a password hash, the API sets its password from the corresponding environment variable on first startup; an existing hashed password is left unchanged. If a role has no account, the API creates one using `ADMIN_USERNAME` or `STAFF_USERNAME` (defaulting to `admin` and `staff`). For an existing account, sign in with its current username in the `users` table. Initial passwords must be 12-64 characters and contain a letter and a number.
+
+Application source code is written in TypeScript. `npm run build` type-checks the root TypeScript and API sources, then builds the Vite frontend; browser JavaScript is generated in the ignored `vite-cbsua_supply_office/dist` directory.
 
 Environment variables are read by the API process. Set them again in each new terminal session or configure them through your deployment environment. The API hashes passwords and stores only hashed, expiring session tokens. The browser does not keep business records, account credentials, or sessions in local storage.
 
 ## Run the application
 
-Run the API from the repository root, and the Vite app from `vite-cbsua_supply_office` in separate terminals. Start MySQL and configure the API environment first.
+Run the API from the repository root with `npm run api`, and the Vite app from `vite-cbsua_supply_office` in a separate terminal. Start PostgreSQL and configure the API environment first.
 
 ```powershell
 npm run api

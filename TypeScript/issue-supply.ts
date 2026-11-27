@@ -393,7 +393,7 @@
     let pdfUrl: string | undefined;
     try {
       if (window.location.protocol === 'file:') {
-        throw new Error('Open this app through XAMPP/localhost so the supplied PDF can be read.');
+        throw new Error('Open this app through its web server so the supplied PDF can be read.');
       }
       if (!browser.PDFLib) {
         throw new Error('The PDF form library did not load. Run npm install and reload this page.');
@@ -540,7 +540,7 @@
     printWindow.document.body.textContent = `Preparing the ${type} form...`;
     try {
       if (window.location.protocol === 'file:') {
-        throw new Error('Open this app through XAMPP/localhost so the supplied PDF can be read.');
+        throw new Error('Open this app through its web server so the supplied PDF can be read.');
       }
       if (!browser.PDFLib) {
         throw new Error('The PDF form library did not load. Run npm install and reload this page.');

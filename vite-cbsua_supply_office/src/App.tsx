@@ -1,11 +1,11 @@
 import { useEffect } from 'react'
 import loginDocument from './html/index.html?raw'
 import logo from './Image/logo.png'
-import { initializeLogin } from './Javascript/login.js'
+import { initializeLogin } from './TypeScript/login.ts'
 import './CSS/style.css'
-import './Javascript/accounts.js'
-import './Javascript/records.js'
-import './Javascript/script.js'
+import './TypeScript/accounts.ts'
+import './TypeScript/records.ts'
+import './TypeScript/script.ts'
 
 const loginMarkup = new DOMParser()
   .parseFromString(loginDocument, 'text/html')

@@ -1,9 +1,16 @@
-const mysql = require('mysql2/promise');
+const { Pool, types } = require('pg');
 const bcrypt = require('bcryptjs');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const databaseName = process.env.DB_NAME || 'cbsua_supply_office';
+types.setTypeParser(types.builtins.DATE, value => value);
+types.setTypeParser(types.builtins.TIMESTAMP, value => value);
+const idTables = new Set([
+  'offices', 'users', 'user_sessions', 'item_categories', 'suppliers', 'inventory_items',
+  'stock_requests', 'stock_receipts', 'stock_issuances', 'stock_movements',
+  'request_status_history', 'password_reset_requests'
+]);
 const officeNames = [
   'Accounting Office',
   'Admission Office',
@@ -49,14 +56,103 @@ const officeNames = [
   'UMIS'
 ];
 
+function toPostgresQuery(sql) {
+  let parameterIndex = 0;
+  let query = sql.replace(/\?/g, () => `$${++parameterIndex}`);
+
+  const insert = /^\s*INSERT\s+INTO\s+([a-z_]+)/i.exec(query);
+  if (insert && idTables.has(insert[1].toLowerCase()) && !/\bRETURNING\b/i.test(query)) {
+    query = query.replace(/;\s*$/, '') + ' RETURNING id';
+  }
+  return query;
+}
+
+function createExecutor(client) {
+  async function execute(sql, parameters = []) {
+    const result = await client.query(toPostgresQuery(sql), parameters);
+    if (result.command === 'SELECT') return [result.rows, result.fields];
+    const firstRow = result.rows && result.rows[0];
+    return [{
+      insertId: firstRow?.id,
+      affectedRows: result.rowCount
+    }, result.fields];
+  }
+
+  return {
+    execute,
+    query: execute,
+    async beginTransaction() {
+      await client.query('BEGIN');
+    },
+    async commit() {
+      await client.query('COMMIT');
+    },
+    async rollback() {
+      await client.query('ROLLBACK');
+    },
+    release() {
+      client.release();
+    }
+  };
+}
+
+function createPool(options) {
+  const pool = new Pool(options);
+  return {
+    execute: (sql, parameters = []) => createExecutor(pool).execute(sql, parameters),
+    query: (sql, parameters = []) => createExecutor(pool).query(sql, parameters),
+    async getConnection() {
+      return createExecutor(await pool.connect());
+    },
+    end: () => pool.end()
+  };
+}
+
+function splitSqlStatements(sql) {
+  const statements = [];
+  let start = 0;
+  let quote = '';
+  let dollarQuote = '';
+  for (let index = 0; index < sql.length; index += 1) {
+    const character = sql[index];
+    if (dollarQuote) {
+      if (sql.startsWith(dollarQuote, index)) {
+        index += dollarQuote.length - 1;
+        dollarQuote = '';
+      }
+      continue;
+    }
+    if (quote) {
+      if (character === quote) {
+        if (quote === "'" && sql[index + 1] === "'") index += 1;
+        else quote = '';
+      }
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+    } else if (character === '$') {
+      const delimiter = /^\$[A-Za-z0-9_]*\$/.exec(sql.slice(index));
+      if (delimiter) dollarQuote = delimiter[0];
+    } else if (character === ';') {
+      const statement = sql.slice(start, index).trim();
+      if (statement) statements.push(statement);
+      start = index + 1;
+    }
+  }
+  const remainder = sql.slice(start).trim();
+  if (remainder) statements.push(remainder);
+  return statements;
+}
+
 async function initializeSchema(pool) {
   const schema = fs.readFileSync(path.join(__dirname, 'database', 'schema.sql'), 'utf8');
-  for (const statement of schema.split(/;\s*(?:\r?\n|$)/).map(value => value.trim()).filter(Boolean)) {
+  for (const statement of splitSqlStatements(schema)) {
     await pool.query(statement);
   }
   for (const [index, name] of officeNames.entries()) {
     await pool.execute(
-      'INSERT IGNORE INTO offices (office_code, name, is_active) VALUES (?, ?, 1)',
+      'INSERT INTO offices (office_code, name, is_active) VALUES (?, ?, 1) ON CONFLICT (office_code) DO NOTHING',
       [`OFF-${String(index + 1).padStart(3, '0')}`, name]
     );
   }
@@ -121,43 +217,35 @@ async function initializeDatabase() {
 
   const connectionOptions = {
     host: process.env.DB_HOST || '127.0.0.1',
-    port: Number(process.env.DB_PORT) || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || ''
+    port: Number(process.env.DB_PORT) || 5432,
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || undefined
   };
-  const connection = await mysql.createConnection(connectionOptions);
+  const maintenancePool = new Pool({ ...connectionOptions, database: 'postgres', max: 1 });
   try {
-    await connection.query(
-      `CREATE DATABASE IF NOT EXISTS ${connection.escapeId(databaseName)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+    const existing = await maintenancePool.query(
+      'SELECT 1 FROM pg_database WHERE datname = $1',
+      [databaseName]
     );
+    if (existing.rowCount === 0) {
+      await maintenancePool.query(`CREATE DATABASE "${databaseName}"`);
+    }
   } finally {
-    await connection.end();
+    await maintenancePool.end();
   }
 
-  const pool = mysql.createPool({
+  const pool = createPool({
     ...connectionOptions,
     database: databaseName,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-    dateStrings: true,
-    decimalNumbers: true
+    max: 10,
+    idleTimeoutMillis: 30000
   });
 
   try {
     await initializeSchema(pool);
-    await pool.query(`CREATE TABLE IF NOT EXISTS record_sequences (
-      sequence_key VARCHAR(80) NOT NULL,
-      next_value BIGINT UNSIGNED NOT NULL DEFAULT 0,
-      PRIMARY KEY (sequence_key)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
-
-    const [attachmentColumns] = await pool.execute(
-      "SHOW COLUMNS FROM stock_receipts LIKE 'attachment_name'"
+    await pool.query(
+      'ALTER TABLE stock_receipts ADD COLUMN IF NOT EXISTS attachment_name VARCHAR(255) NULL'
     );
-    if (attachmentColumns.length === 0) {
-      await pool.query('ALTER TABLE stock_receipts ADD COLUMN attachment_name VARCHAR(255) NULL AFTER remarks');
-    }
 
     await configureAccount(pool, 'admin', 'ADMIN_PASSWORD', process.env.ADMIN_USERNAME || 'admin',
       'Supply Office', 'Administrator', 'Head, Supply Office');
@@ -173,3 +261,5 @@ async function initializeDatabase() {
 }
 
 module.exports = { initializeDatabase };
+
+export {};

@@ -1,3 +1,5 @@
+import type { NetworkInterfaceInfo } from 'node:os';
+
 const express = require('express');
 const os = require('node:os');
 const path = require('node:path');
@@ -36,7 +38,7 @@ app.use(express.json({ limit: '8kb' }));
 
 function getLanIPv4Address() {
   const addresses = Object.values(os.networkInterfaces())
-    .flatMap(network => network || [])
+    .flatMap((network: NetworkInterfaceInfo[] | undefined) => network || [])
     .filter(address => address.family === 'IPv4' && !address.internal
       && !address.address.startsWith('169.254.'));
   const privateAddress = addresses.find(({ address }) =>
@@ -78,7 +80,7 @@ function createScannerUrl(appUrl, request, asset) {
     throw new Error('Only ICS and PAR asset records can be shared as QR codes.');
   }
 
-  const payload = { version: 1 };
+  const payload: Record<string, string | number> = { version: 1 };
   for (const field of assetFields) {
     if (asset[field] === undefined || asset[field] === null) continue;
     if (!['string', 'number', 'boolean'].includes(typeof asset[field])) {
@@ -132,3 +134,5 @@ startServer().catch(error => {
   console.error('The API could not start.', error);
   process.exitCode = 1;
 });
+
+export {};
