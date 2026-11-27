@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "api": "node api-server.js"
+    "api": "node api-server.js",
+    "seed:sample-allocations": "node database/seed-sample-office-allocations.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

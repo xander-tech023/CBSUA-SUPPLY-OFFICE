@@ -377,6 +377,19 @@ window.IMS.pageFeatures.push(() => {
       annualUsage.className = 'mt-2 text-sm text-cbsua-muted';
       annualUsage.textContent = `Annual allocation: ${quota.annualUsed} / ${quota.annualLimit} ${quota.unit} · ${Math.max(0, quota.annualLimit - quota.annualUsed)} remaining`;
 
+      const item = window.IMS.getLocalRecords('items')
+        .find(entry => String(entry.id) === String(quota.itemId));
+      const requestableQuantity = item && Number(item.quantity) > 0
+        ? Math.min(Number(item.quantity), Number(window.IMS.getQuarterlyRequestLimitRemaining(
+          quota.itemId, user.office
+        )))
+        : 0;
+      const requestAvailability = document.createElement('p');
+      requestAvailability.className = 'mt-2 text-sm text-cbsua-muted';
+      requestAvailability.textContent = requestableQuantity > 0
+        ? `${requestableQuantity} ${quota.unit} can be requested this quarter.`
+        : 'No quantity is currently available to request.';
+
       const quarters = document.createElement('div');
       quarters.className = 'mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4';
       quota.quarterLimits.forEach((limit, index) => {
@@ -385,7 +398,16 @@ window.IMS.pageFeatures.push(() => {
         quarter.textContent = `Q${index + 1}: ${quota.quarterUsage[index]} / ${limit} ${quota.unit}`;
         quarters.append(quarter);
       });
-      card.append(heading, annualUsage, quarters);
+      card.append(heading, annualUsage, requestAvailability, quarters);
+      if (requestableQuantity > 0) {
+        const requestButton = document.createElement('button');
+        requestButton.type = 'button';
+        requestButton.dataset.openModal = '';
+        requestButton.dataset.requestItem = quota.itemId;
+        requestButton.className = 'mt-4 rounded-lg bg-cbsua-primary px-3 py-2 text-sm font-medium text-white hover:bg-green-700';
+        requestButton.textContent = 'Request this item';
+        card.append(requestButton);
+      }
       officeItemAllocationList.append(card);
     });
   }
@@ -505,8 +527,20 @@ window.IMS.pageFeatures.push(() => {
   document.addEventListener('click', event => {
     const requestButton = event.target.closest('[data-request-item]');
     if (requestButton && itemSelect) {
-      itemSelect.value = requestButton.dataset.requestItem;
-      itemSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      const itemId = requestButton.dataset.requestItem;
+      const item = window.IMS.getLocalRecords('items')
+        .find(entry => String(entry.id) === String(itemId));
+      const classificationKey = Object.keys(requestClassifications).find(key =>
+        requestClassifications[key].itemClassification
+          === String(item?.supplyClassification || '').trim().toLowerCase());
+      const classificationButton = classificationKey
+        ? document.querySelector(`[data-select-supply-classification="${classificationKey}"]`)
+        : null;
+      classificationButton?.click();
+      if ([...itemSelect.options].some(option => option.value === itemId)) {
+        itemSelect.value = itemId;
+        itemSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
     }
     if (!notificationPanel?.contains(event.target) && !notificationToggle?.contains(event.target)) {
       setNotificationPanelOpen(false);

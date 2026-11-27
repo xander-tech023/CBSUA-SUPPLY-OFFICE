@@ -54,11 +54,136 @@ async function initializeSchema(pool) {
   for (const statement of schema.split(/;\s*(?:\r?\n|$)/).map(value => value.trim()).filter(Boolean)) {
     await pool.query(statement);
   }
-  for (const [index, name] of officeNames.entries()) {
-    await pool.execute(
-      'INSERT IGNORE INTO offices (office_code, name, is_active) VALUES (?, ?, 1)',
-      [`OFF-${String(index + 1).padStart(3, '0')}`, name]
+  await synchronizeOfficeDirectory(pool);
+}
+
+async function synchronizeOfficeDirectory(pool) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [existingOffices] = await connection.execute('SELECT id FROM offices ORDER BY id');
+    for (const office of existingOffices) {
+      await connection.execute(
+        'UPDATE offices SET office_code = ? WHERE id = ?',
+        [`TMP-${office.id}`, office.id]
+      );
+    }
+
+    for (const [index, name] of officeNames.entries()) {
+      await connection.execute(
+        'INSERT IGNORE INTO offices (office_code, name, is_active) VALUES (?, ?, 1)',
+        [`TMP-NEW-${index + 1}`, name]
+      );
+    }
+
+    const [offices] = await connection.execute('SELECT id, name FROM offices ORDER BY id');
+    for (const office of offices) {
+      const officeIndex = officeNames.indexOf(office.name);
+      const officeCode = officeIndex === -1
+        ? `LEGACY-${office.id}`
+        : `OFF-${String(officeIndex + 1).padStart(3, '0')}`;
+      await connection.execute('UPDATE offices SET office_code = ? WHERE id = ?', [
+        officeCode,
+        office.id
+      ]);
+    }
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function seedSampleOfficeAllocations(pool) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [yearRows] = await connection.execute('SELECT YEAR(CURRENT_DATE()) AS allocation_year');
+    const allocationYear = Number(yearRows[0].allocation_year);
+    const placeholders = officeNames.map(() => '?').join(', ');
+    const [officeRows] = await connection.execute(
+      `SELECT id, name FROM offices WHERE is_active = 1 AND name IN (${placeholders})`,
+      officeNames
     );
+    const officeByName = new Map(officeRows.map(office => [office.name, office]));
+    const offices = officeNames.map(name => officeByName.get(name)).filter(Boolean);
+    if (offices.length !== officeNames.length) {
+      throw new Error('Sample allocations require every configured office to be active in the database.');
+    }
+    const [admins] = await connection.execute(
+      "SELECT id FROM users WHERE role = 'admin' AND is_active = 1 ORDER BY id LIMIT 1"
+    );
+    if (!admins[0]) throw new Error('An active administrator is required to seed sample allocations.');
+
+    const minimumAnnualPerOffice = 4;
+    const minimumCampusStock = offices.length * minimumAnnualPerOffice;
+    const [items] = await connection.execute(
+      `SELECT id, item_code, name, unit, FLOOR(quantity_on_hand) AS stock
+         FROM inventory_items
+        WHERE is_active = 1 AND quantity_on_hand >= ?
+        ORDER BY name, item_code`,
+      [minimumCampusStock]
+    );
+    const seeded = [];
+    const skipped = [];
+
+    for (const item of items) {
+      const [existing] = await connection.execute(
+        `SELECT
+           (SELECT COUNT(*) FROM item_annual_request_budgets
+             WHERE item_id = ? AND allocation_year = ?) AS budget_count,
+           (SELECT COUNT(*) FROM office_item_request_quotas
+             WHERE item_id = ? AND allocation_year = ?) AS quota_count,
+           (SELECT COUNT(*) FROM stock_requests
+             WHERE item_id = ? AND YEAR(created_at) = ?
+               AND status NOT IN ('Rejected', 'Cancelled')) AS request_count`,
+        [item.id, allocationYear, item.id, allocationYear, item.id, allocationYear]
+      );
+      if (Number(existing[0].budget_count) || Number(existing[0].quota_count)
+        || Number(existing[0].request_count)) {
+        skipped.push({ itemCode: item.item_code, reason: 'Existing budget, allocation, or active request' });
+        continue;
+      }
+
+      const stock = Number(item.stock);
+      const baseAllocation = Math.floor(stock / offices.length);
+      const remainder = stock % offices.length;
+      if (baseAllocation < minimumAnnualPerOffice) continue;
+
+      await connection.execute(
+        `INSERT INTO item_annual_request_budgets
+          (item_id, allocation_year, annual_limit, updated_by)
+         VALUES (?, ?, ?, ?)`,
+        [item.id, allocationYear, stock, admins[0].id]
+      );
+      for (const [index, office] of offices.entries()) {
+        const annualLimit = baseAllocation + (index < remainder ? 1 : 0);
+        await connection.execute(
+          `INSERT INTO office_item_request_quotas
+            (office_id, item_id, allocation_year, annual_limit, updated_by)
+           VALUES (?, ?, ?, ?, ?)`,
+          [office.id, item.id, allocationYear, annualLimit, admins[0].id]
+        );
+      }
+      seeded.push({
+        itemCode: item.item_code,
+        itemName: item.name,
+        stock,
+        officeCount: offices.length,
+        minimumAnnualPerOffice: baseAllocation,
+        remainder
+      });
+    }
+
+    await connection.commit();
+    return { allocationYear, officeCount: offices.length, seeded, skipped };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
   }
 }
 
@@ -172,4 +297,4 @@ async function initializeDatabase() {
   }
 }
 
-module.exports = { initializeDatabase };
+module.exports = { initializeDatabase, seedSampleOfficeAllocations };
