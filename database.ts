@@ -1,3 +1,6 @@
+import process from 'node:process';
+try { process.loadEnvFile('.env'); } catch {}
+
 const { Pool, types } = require('pg');
 const bcrypt = require('bcryptjs');
 const fs = require('node:fs');
@@ -151,6 +154,27 @@ async function initializeSchema(pool) {
     await pool.query(statement);
   }
 
+  let lowStockViewDefinition;
+  const [inventoryActiveColumns] = await pool.query(
+    `SELECT data_type FROM information_schema.columns
+     WHERE table_schema = current_schema() AND table_name = 'inventory_items' AND column_name = 'is_active'`
+  );
+  if (inventoryActiveColumns[0]?.data_type === 'boolean') {
+    const [views] = await pool.query(
+      `SELECT pg_get_viewdef(to_regclass('v_low_stock_items'), true) AS definition`
+    );
+    if (views[0]?.definition) {
+      lowStockViewDefinition = views[0].definition.replace(
+        /\bWHERE\s+i\.is_active\b/i,
+        'WHERE i.is_active <> 0'
+      );
+      if (lowStockViewDefinition === views[0].definition) {
+        throw new Error('Cannot migrate inventory_items.is_active because v_low_stock_items has an unsupported definition.');
+      }
+      await pool.query('DROP VIEW v_low_stock_items');
+    }
+  }
+
   const booleanColumns = [
     ['offices', 'is_active'],
     ['users', 'must_change_password'],
@@ -160,12 +184,12 @@ async function initializeSchema(pool) {
     ['inventory_items', 'is_active']
   ];
   for (const [table, column] of booleanColumns) {
-    const result = await pool.query(
+    const [columns] = await pool.query(
       `SELECT data_type FROM information_schema.columns
        WHERE table_schema = current_schema() AND table_name = $1 AND column_name = $2`,
       [table, column]
     );
-    if (result.rows[0]?.data_type !== 'boolean') continue;
+    if (columns[0]?.data_type !== 'boolean') continue;
 
     await pool.query(`ALTER TABLE "${table}" ALTER COLUMN "${column}" DROP DEFAULT`);
     await pool.query(
@@ -175,9 +199,13 @@ async function initializeSchema(pool) {
     await pool.query(`ALTER TABLE "${table}" ALTER COLUMN "${column}" SET DEFAULT 1`);
   }
 
+  if (lowStockViewDefinition) {
+    await pool.query(`CREATE VIEW v_low_stock_items AS ${lowStockViewDefinition}`);
+  }
+
   for (const [index, name] of officeNames.entries()) {
-    await pool.execute(
-      'INSERT INTO offices (office_code, name, is_active) VALUES (?, ?, 1) ON CONFLICT (office_code) DO NOTHING',
+    await pool.query(
+      'INSERT INTO offices (office_code, name, is_active) VALUES ($1, $2, 1) ON CONFLICT (office_code) DO NOTHING',
       [`OFF-${String(index + 1).padStart(3, '0')}`, name]
     );
   }
@@ -194,8 +222,8 @@ function getPassword(name) {
 }
 
 async function configureAccount(pool, role, envName, username, firstName, surname, position) {
-  const [accounts] = await pool.execute(
-    'SELECT id, username, password_hash, position, is_active FROM users WHERE role = ? ORDER BY id LIMIT 1',
+  const [accounts] = await pool.query(
+    'SELECT id, username, password_hash, position, is_active FROM users WHERE role = $1 ORDER BY id LIMIT 1',
     [role]
   );
   const account = accounts[0];
@@ -204,7 +232,7 @@ async function configureAccount(pool, role, envName, username, firstName, surnam
       throw new Error(`The existing ${role} account is inactive. Enable it in the database before starting the API.`);
     }
     if (!account.position) {
-      await pool.execute('UPDATE users SET position = ? WHERE id = ?', [position, account.id]);
+      await pool.query('UPDATE users SET position = $1 WHERE id = $2', [position, account.id]);
     }
     if (account.password_hash) return;
     const passwordHash = await bcrypt.hash(getPassword(envName), 12);
@@ -242,9 +270,9 @@ async function initializeDatabase() {
 
   const connectionOptions = {
     host: process.env.DB_HOST || '127.0.0.1',
-    port: Number(process.env.DB_PORT) || 5432,
+    port: Number(process.env.DB_PORT) || 5000,
     user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || undefined
+    password: (process.env.DB_PASSWORD ?? '')
   };
   const maintenancePool = new Pool({ ...connectionOptions, database: 'postgres', max: 1 });
   try {
